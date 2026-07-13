@@ -54,7 +54,7 @@ def list_reviews(
         query = query.filter(Review.text.ilike(f"%{search}%"))
     if platform:
         query = query.filter(Review.platform == platform)
-    if rating:
+    if rating is not None:
         query = query.filter(Review.rating == rating)
     if sentiment:
         query = query.filter(Review.sentiment == sentiment)
@@ -80,7 +80,7 @@ def export_reviews(
     query = db.query(Review)
     if platform:
         query = query.filter(Review.platform == platform)
-    if rating:
+    if rating is not None:
         query = query.filter(Review.rating == rating)
 
     reviews = query.order_by(Review.created_at.desc()).all()
