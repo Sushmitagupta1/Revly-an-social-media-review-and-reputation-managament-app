@@ -28,6 +28,17 @@ class ReviewListResponse(BaseModel):
     pages: int
 
 
+class ReviewResolveRequest(BaseModel):
+    is_resolved: bool
+
+
+class InboxResponse(BaseModel):
+    reviews: list[ReviewResponse]
+    total: int
+    page: int
+    pages: int
+
+
 class ReviewStatsResponse(BaseModel):
     total: int
     average_rating: float

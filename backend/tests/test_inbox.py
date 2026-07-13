@@ -58,7 +58,11 @@ def test_resolve_review(client, db_session):
     headers = _auth_header(user)
     review_id = str(db_session.query(Review).first().id)
 
-    resp = client.patch(f"/api/v1/reviews/{review_id}/resolve", headers=headers)
+    resp = client.patch(
+        f"/api/v1/reviews/{review_id}/resolve",
+        headers=headers,
+        json={"is_resolved": True},
+    )
     assert resp.status_code == 200
     assert resp.json()["is_resolved"] is True
 

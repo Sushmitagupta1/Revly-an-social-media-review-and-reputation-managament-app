@@ -16,6 +16,7 @@ export default function ReviewDetail({ review, onClose }: Props) {
   const [replies, setReplies] = useState<Reply[]>([])
   const [aiReply, setAiReply] = useState<Reply | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [tone, setTone] = useState("professional")
   const { generateReply, createReply, approveReply, sendReply, deleteReply } = useReviewStore()
 
   const handleGenerate = async (tone?: string) => {
@@ -98,14 +99,26 @@ export default function ReviewDetail({ review, onClose }: Props) {
         <div className="border-t border-border pt-4 mt-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-text">AI Reply</h3>
-            <button
-              onClick={() => handleGenerate()}
-              disabled={isGenerating}
-              className="flex items-center gap-1 rounded-lg bg-info/10 px-3 py-1.5 text-xs font-medium text-info hover:bg-info/20 disabled:opacity-50"
-            >
-              {isGenerating ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-              {aiReply ? "Regenerate" : "Generate Reply"}
-            </button>
+            <div className="flex items-center gap-2">
+              <select
+                value={tone}
+                onChange={(e) => setTone(e.target.value)}
+                className="rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text"
+              >
+                <option value="professional">Professional</option>
+                <option value="friendly">Friendly</option>
+                <option value="formal">Formal</option>
+                <option value="empathetic">Empathetic</option>
+              </select>
+              <button
+                onClick={() => handleGenerate(tone)}
+                disabled={isGenerating}
+                className="flex items-center gap-1 rounded-lg bg-info/10 px-3 py-1.5 text-xs font-medium text-info hover:bg-info/20 disabled:opacity-50"
+              >
+                {isGenerating ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                {aiReply ? "Regenerate" : "Generate Reply"}
+              </button>
+            </div>
           </div>
 
           <div className="space-y-3 mb-4">
