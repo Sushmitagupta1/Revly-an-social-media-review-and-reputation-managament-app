@@ -3,14 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, CurrentUser, DbSession
+from app.core.constants import MOCK_BRAND_ID
 from app.models.competitor import Competitor
 from app.schemas.competitor import (
     CompetitorCreate, CompetitorUpdate, CompetitorResponse, CompetitorListResponse,
 )
 
 router = APIRouter()
-
-MOCK_BRAND_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
 @router.get("", response_model=CompetitorListResponse)
@@ -42,7 +41,10 @@ def update_competitor(
     db: DbSession,
     _user: CurrentUser,
 ):
-    comp = db.query(Competitor).filter(Competitor.id == uuid.UUID(competitor_id)).first()
+    comp = db.query(Competitor).filter(
+        Competitor.id == uuid.UUID(competitor_id),
+        Competitor.brand_id == MOCK_BRAND_ID,
+    ).first()
     if not comp:
         raise HTTPException(status_code=404, detail="Competitor not found")
     for k, v in body.model_dump(exclude_unset=True).items():
@@ -58,7 +60,10 @@ def delete_competitor(
     db: DbSession,
     _user: CurrentUser,
 ):
-    comp = db.query(Competitor).filter(Competitor.id == uuid.UUID(competitor_id)).first()
+    comp = db.query(Competitor).filter(
+        Competitor.id == uuid.UUID(competitor_id),
+        Competitor.brand_id == MOCK_BRAND_ID,
+    ).first()
     if not comp:
         raise HTTPException(status_code=404, detail="Competitor not found")
     db.delete(comp)

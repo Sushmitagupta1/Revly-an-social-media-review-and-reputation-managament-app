@@ -1,8 +1,6 @@
-import uuid
+from app.core.constants import MOCK_BRAND_ID
 from app.core.database import SessionLocal
 from app.models.competitor import Competitor
-
-MOCK_BRAND_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 COMPETITORS = [
     ("Food Bazaar", "google", 4.2, 150),
@@ -28,3 +26,7 @@ def seed_competitors():
         print(f"Seeded {len(COMPETITORS)} competitors.")
     finally:
         db.close()
+
+
+if __name__ == "__main__":
+    seed_competitors()
