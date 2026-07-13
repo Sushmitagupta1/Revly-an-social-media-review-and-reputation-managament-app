@@ -39,7 +39,21 @@ def test_leaderboard(client, db_session):
     data = resp.json()
     assert "locations" in data
     assert len(data["locations"]) == 2
+
+    # Check all fields present
     for loc in data["locations"]:
         assert "location_id" in loc
         assert "avg_rating" in loc
         assert "review_count" in loc
+        assert "sentiment_breakdown" in loc
+        assert "positive_percentage" in loc
+        assert "rank" in loc
+
+    # Check sort order: first location should have higher avg_rating
+    assert data["locations"][0]["avg_rating"] >= data["locations"][1]["avg_rating"]
+    assert data["locations"][0]["rank"] == 1
+    assert data["locations"][1]["rank"] == 2
+
+    # Check review counts (3 reviews per location from seed)
+    for loc in data["locations"]:
+        assert loc["review_count"] == 3
