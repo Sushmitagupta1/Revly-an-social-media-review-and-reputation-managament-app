@@ -10,6 +10,7 @@ from app.api.v1.inbox import router as inbox_router
 from app.api.v1.complaints import router as complaints_router
 from app.api.v1.praises import router as praises_router
 from app.api.v1.leaderboard import router as leaderboard_router
+from app.api.v1.competitors import router as competitors_router
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(auth_router, prefix="/auth", tags=["auth"])
@@ -22,3 +23,4 @@ router.include_router(inbox_router, prefix="/inbox", tags=["inbox"])
 router.include_router(complaints_router, prefix="/complaints", tags=["complaints"])
 router.include_router(praises_router, prefix="/praises", tags=["praises"])
 router.include_router(leaderboard_router, prefix="/leaderboard", tags=["leaderboard"])
+router.include_router(competitors_router, prefix="/competitors", tags=["competitors"])

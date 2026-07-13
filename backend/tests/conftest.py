@@ -10,8 +10,9 @@ from app.main import app
 TEST_DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
 
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 SQLiteTypeCompiler.visit_JSONB = lambda self, type_, **kw: "JSON"
+SQLiteTypeCompiler.visit_UUID = lambda self, type_, **kw: "CHAR(36)"
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
