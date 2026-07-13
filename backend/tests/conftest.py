@@ -2,12 +2,16 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 
 from app.core.database import Base
 from app.main import app
 
 TEST_DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+
+from sqlalchemy.dialects.postgresql import JSONB
+SQLiteTypeCompiler.visit_JSONB = lambda self, type_, **kw: "JSON"
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
