@@ -17,15 +17,12 @@ router = APIRouter()
 
 @router.get("", response_model=AutomationRuleListResponse)
 def list_rules(db: DbSession, _user: CurrentUser):
-    rows = (
-        db.query(AutomationRule)
-        .filter(AutomationRule.brand_id == MOCK_BRAND_ID)
-        .order_by(AutomationRule.created_at.desc())
-        .all()
-    )
+    query = db.query(AutomationRule).filter(AutomationRule.brand_id == MOCK_BRAND_ID)
+    total = query.count()
+    rows = query.order_by(AutomationRule.created_at.desc()).limit(100).all()
     return AutomationRuleListResponse(
         rules=[AutomationRuleResponse.model_validate(r) for r in rows],
-        total=len(rows),
+        total=total,
     )
 
 
