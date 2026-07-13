@@ -2,6 +2,8 @@
 node_modules/
 __pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/
 .venv/
 venv/
 
@@ -11,8 +13,8 @@ build/
 *.egg-info/
 
 # Environment
-.env
-.env.local
+.env*
+!.env.example
 
 # IDE
 .vscode/
