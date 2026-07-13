@@ -10,5 +10,6 @@ from app.models.location import Location
 from app.models.audit_log import AuditLog
 from app.models.automation_rule import AutomationRule
 from app.models.auto_response import AutoResponse
+from app.models.integration import Integration
 
-__all__ = ["Base", "Role", "User", "Review", "Reply", "ChatMessage", "Competitor", "Notification", "Location", "AuditLog", "AutomationRule", "AutoResponse"]
+__all__ = ["Base", "Role", "User", "Review", "Reply", "ChatMessage", "Competitor", "Notification", "Location", "AuditLog", "AutomationRule", "AutoResponse", "Integration"]
