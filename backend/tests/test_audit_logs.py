@@ -1,7 +1,5 @@
 import uuid
 import pytest
-from fastapi.testclient import TestClient
-from app.main import app
 from app.models.audit_log import AuditLog
 from app.models.user import User
 from app.core.constants import MOCK_BRAND_ID
@@ -25,19 +23,17 @@ def auth_headers(db_session):
 @pytest.fixture(autouse=True)
 def _seed_audit_logs(db_session):
     from app.seeds.audit_logs import ACTIONS, SEED_USER_ID
-    for action, entity_type, details in ACTIONS:
+    for action, entity_type, entity_id, details in ACTIONS:
         db_session.add(AuditLog(
             brand_id=MOCK_BRAND_ID,
             user_id=SEED_USER_ID,
             user_name="System",
             action=action,
             entity_type=entity_type,
+            entity_id=entity_id,
             details=details,
         ))
     db_session.commit()
-
-
-client = TestClient(app)
 
 
 def test_list_audit_logs(client, auth_headers):
