@@ -16,6 +16,7 @@ from app.api.v1.notifications import router as notifications_router
 from app.api.v1.locations import router as locations_router
 from app.api.v1.audit_logs import router as audit_logs_router
 from app.api.v1.automation import router as automation_router
+from app.api.v1.auto_responses import router as auto_responses_router
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(auth_router, prefix="/auth", tags=["auth"])
@@ -34,3 +35,4 @@ router.include_router(reports_router, prefix="/reports", tags=["reports"])
 router.include_router(locations_router, prefix="/locations", tags=["locations"])
 router.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
 router.include_router(automation_router, prefix="/automation", tags=["automation"])
+router.include_router(auto_responses_router, prefix="/auto-responses", tags=["auto-responses"])
