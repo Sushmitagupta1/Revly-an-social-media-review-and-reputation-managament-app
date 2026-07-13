@@ -1,1 +1,44 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+
+  --color-primary: #0F172A;
+  --color-sidebar: #16213E;
+  --color-sidebar-hover: #2E4C9A;
+  --color-dashboard-bg: #0F163D;
+  --color-page-bg: #182A63;
+
+  --color-card: #F8F8F6;
+  --color-card-secondary: #F3F5F8;
+  --color-card-blue: #DCEAFB;
+  --color-card-pink: #F8D7D9;
+  --color-card-yellow: #FFF1CF;
+  --color-card-green: #EDF7EF;
+  --color-surface: #FFFFFF;
+  --color-background: #F9FAFB;
+
+  --color-success: #12B76A;
+  --color-success-soft: #6FE5A6;
+  --color-warning: #F59E0B;
+  --color-warning-soft: #F8E38A;
+  --color-danger: #E53935;
+  --color-danger-soft: #F7C9C9;
+  --color-info: #4361EE;
+  --color-info-soft: #BFD8FF;
+
+  --color-accent: #FF5A1F;
+  --color-accent-teal: #0D8A74;
+
+  --color-text: #111827;
+  --color-text-secondary: #6B7280;
+  --color-text-muted: #9CA3AF;
+  --color-border: #E5E7EB;
+}
+
+@layer base {
+  body {
+    @apply bg-primary text-white font-sans antialiased;
+  }
+}
