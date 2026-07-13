@@ -29,7 +29,7 @@ export default function PlatformChart({ data }: Props) {
           </Pie>
           <Tooltip
             contentStyle={{ borderRadius: 12, border: "1px solid #E5E7EB", fontSize: 12 }}
-            formatter={(value: number, name: string) => [`${value} reviews`, name]}
+            formatter={(value: any, name: any) => [`${value} reviews`, name]}
           />
           <Legend
             verticalAlign="bottom"

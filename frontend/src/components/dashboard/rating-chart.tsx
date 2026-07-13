@@ -22,7 +22,7 @@ export default function RatingChart({ data }: Props) {
           <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} />
           <Tooltip
             contentStyle={{ borderRadius: 12, border: "1px solid #E5E7EB", fontSize: 12 }}
-            formatter={(value: number) => [`${value} reviews`, "Count"]}
+            formatter={(value: any) => [`${value} reviews`, "Count"]}
           />
           <Bar dataKey="count" radius={[6, 6, 0, 0]}>
             {data.map((_, index) => (
