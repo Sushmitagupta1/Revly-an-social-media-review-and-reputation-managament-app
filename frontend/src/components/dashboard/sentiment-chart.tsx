@@ -29,7 +29,7 @@ export default function SentimentChart({ data }: Props) {
           <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} />
           <Tooltip
             contentStyle={{ borderRadius: 12, border: "1px solid #E5E7EB", fontSize: 12 }}
-            labelFormatter={(v: string) => new Date(v).toLocaleDateString()}
+            labelFormatter={(v: React.ReactNode) => new Date(String(v)).toLocaleDateString()}
           />
           <Area
             type="monotone"
