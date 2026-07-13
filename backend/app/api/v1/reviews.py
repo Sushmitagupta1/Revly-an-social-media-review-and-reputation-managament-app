@@ -1,15 +1,18 @@
 import io
 import math
+import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user
 from app.core.csv_export import export_reviews_csv
 from app.models.review import Review
+from app.models.user import User
 from app.schemas.review import ReviewListResponse, ReviewResponse, ReviewStatsResponse
 
 router = APIRouter()
@@ -91,3 +94,23 @@ def export_reviews(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=reviews.csv"},
     )
+
+
+class ResolveResponse(BaseModel):
+    id: str
+    is_resolved: bool
+
+
+@router.patch("/{review_id}/resolve", response_model=ResolveResponse)
+def resolve_review(
+    review_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    _user: Annotated[User, Depends(get_current_user)],
+):
+    review = db.query(Review).filter(Review.id == uuid.UUID(review_id)).first()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    review.is_resolved = not review.is_resolved
+    db.commit()
+    db.refresh(review)
+    return ResolveResponse(id=str(review.id), is_resolved=review.is_resolved)
