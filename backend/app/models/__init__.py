@@ -7,5 +7,6 @@ from app.models.chat_message import ChatMessage
 from app.models.competitor import Competitor
 from app.models.notification import Notification
 from app.models.location import Location
+from app.models.audit_log import AuditLog
 
-__all__ = ["Base", "Role", "User", "Review", "Reply", "ChatMessage", "Competitor", "Notification", "Location"]
+__all__ = ["Base", "Role", "User", "Review", "Reply", "ChatMessage", "Competitor", "Notification", "Location", "AuditLog"]
