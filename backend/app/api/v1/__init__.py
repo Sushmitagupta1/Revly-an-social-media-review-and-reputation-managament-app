@@ -11,6 +11,9 @@ from app.api.v1.complaints import router as complaints_router
 from app.api.v1.praises import router as praises_router
 from app.api.v1.leaderboard import router as leaderboard_router
 from app.api.v1.competitors import router as competitors_router
+from app.api.v1.reports import router as reports_router
+from app.api.v1.notifications import router as notifications_router
+from app.api.v1.locations import router as locations_router
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(auth_router, prefix="/auth", tags=["auth"])
@@ -24,3 +27,6 @@ router.include_router(complaints_router, prefix="/complaints", tags=["complaints
 router.include_router(praises_router, prefix="/praises", tags=["praises"])
 router.include_router(leaderboard_router, prefix="/leaderboard", tags=["leaderboard"])
 router.include_router(competitors_router, prefix="/competitors", tags=["competitors"])
+router.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
+router.include_router(reports_router, prefix="/reports", tags=["reports"])
+router.include_router(locations_router, prefix="/locations", tags=["locations"])
