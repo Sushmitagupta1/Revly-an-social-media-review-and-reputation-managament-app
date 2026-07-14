@@ -56,7 +56,7 @@ export default function ReviewsPage() {
         <Button
           variant="outline"
           onClick={() => downloadReviewsCsv(filters.platform || undefined, filters.rating || undefined)}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 border-accent text-accent hover:bg-accent hover:text-white"
         >
           <Download className="h-4 w-4" /> Download
         </Button>

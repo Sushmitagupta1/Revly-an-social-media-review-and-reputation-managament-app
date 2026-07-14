@@ -5,7 +5,10 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+import json
+
 from app.api.deps import get_db
+from app.core.constants import TOPIC_LABELS
 from app.models.review import Review
 from app.schemas.dashboard import (
     DashboardResponse,
@@ -199,6 +202,40 @@ def get_dashboard(
         complaints_trend.append(TrendPoint(date=day.isoformat(), count=day_complaints, avg_rating=0))
         praises_trend.append(TrendPoint(date=day.isoformat(), count=day_praises, avg_rating=0))
 
+    # ── Complaint topics ──
+    complaint_query = base_query.filter(Review.sentiment == "negative")
+    topic_counter_complaints: dict[str, int] = {}
+    for r in complaint_query.yield_per(500):
+        if r.topics:
+            raw = r.topics
+            if isinstance(raw, str):
+                try:
+                    raw = json.loads(raw)
+                except (json.JSONDecodeError, TypeError):
+                    raw = []
+            if isinstance(raw, list):
+                for t in raw:
+                    label = TOPIC_LABELS.get(t, t.replace("_", " ").title())
+                    topic_counter_complaints[label] = topic_counter_complaints.get(label, 0) + 1
+    complaint_topics = [{"topic": t, "count": c} for t, c in sorted(topic_counter_complaints.items(), key=lambda x: x[1], reverse=True)]
+
+    # ── Praise topics ──
+    praise_query = base_query.filter(Review.sentiment == "positive")
+    topic_counter_praises: dict[str, int] = {}
+    for r in praise_query.yield_per(500):
+        if r.topics:
+            raw = r.topics
+            if isinstance(raw, str):
+                try:
+                    raw = json.loads(raw)
+                except (json.JSONDecodeError, TypeError):
+                    raw = []
+            if isinstance(raw, list):
+                for t in raw:
+                    label = TOPIC_LABELS.get(t, t.replace("_", " ").title())
+                    topic_counter_praises[label] = topic_counter_praises.get(label, 0) + 1
+    praise_topics = [{"topic": t, "count": c} for t, c in sorted(topic_counter_praises.items(), key=lambda x: x[1], reverse=True)]
+
     return DashboardResponse(
         kpis=kpis,
         sentiment_trend=sentiment_trend,
@@ -215,4 +252,6 @@ def get_dashboard(
         praises_by_location=praises_by_location,
         complaints_trend=complaints_trend,
         praises_trend=praises_trend,
+        complaint_topics=complaint_topics,
+        praise_topics=praise_topics,
     )

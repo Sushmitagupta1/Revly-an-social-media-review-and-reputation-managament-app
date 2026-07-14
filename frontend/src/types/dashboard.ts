@@ -78,4 +78,6 @@ export interface DashboardData {
   praises_by_location: PraiseLocation[]
   complaints_trend: TrendPoint[]
   praises_trend: TrendPoint[]
+  complaint_topics: TopicCount[]
+  praise_topics: TopicCount[]
 }

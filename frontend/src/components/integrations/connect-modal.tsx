@@ -1,65 +1,137 @@
-import { useState } from "react"
-import { X, Mail, Smartphone, ArrowLeft, CheckCircle, MapPin } from "lucide-react"
+import { useState, useEffect } from "react"
+import { X, ArrowLeft, CheckCircle, MapPin, Loader2, Key, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useIntegrationStore } from "@/stores/integration-store"
+import apiClient from "@/lib/api-client"
 
 interface Props {
   platform: string
   onClose: () => void
 }
 
-const platformConfig: Record<string, { name: string; color: string; icon: string }> = {
-  google: { name: "Google Business", color: "#4A74FF", icon: "G" },
-  zomato: { name: "Zomato", color: "#E04F5F", icon: "Z" },
-  swiggy: { name: "Swiggy", color: "#FF8C00", icon: "S" },
-  reelo: { name: "Reelo", color: "#8B5CF6", icon: "R" },
-  magicpin: { name: "Magicpin", color: "#20C997", icon: "M" },
-  tripadvisor: { name: "TripAdvisor", color: "#34E0A1", icon: "T" },
+const platformConfig: Record<string, { name: string; color: string; icon: string; apiUrl: string; helpUrl: string }> = {
+  google: { name: "Google Business", color: "#4A74FF", icon: "G", apiUrl: "", helpUrl: "https://developers.google.com/my-business" },
+  zomato: { name: "Zomato", color: "#E04F5F", icon: "Z", apiUrl: "https://developers.zomato.com/documentation", helpUrl: "https://developers.zomato.com" },
+  swiggy: { name: "Swiggy", color: "#FF8C00", icon: "S", apiUrl: "", helpUrl: "https://www.swiggy.com" },
+  reelo: { name: "Reelo", color: "#8B5CF6", icon: "R", apiUrl: "", helpUrl: "https://reelo.io" },
+  magicpin: { name: "Magicpin", color: "#20C997", icon: "M", apiUrl: "", helpUrl: "" },
+  tripadvisor: { name: "TripAdvisor", color: "#34E0A1", icon: "T", apiUrl: "", helpUrl: "" },
 }
 
-const mockAccounts = [
-  { id: "1", email: "graphics@uppercrust.com", locations: 15 },
-  { id: "2", email: "marketing@uppercrust.com", locations: 8 },
-  { id: "3", email: "franchise@uppercrust.com", locations: 5 },
-]
+type Step = "auth" | "locations" | "success"
 
-const mockLocations = [
-  { id: "1", name: "Upper Crust Vastrapur", selected: true },
-  { id: "2", name: "Upper Crust Vijay Cross", selected: true },
-  { id: "3", name: "Lithosphere", selected: false },
-  { id: "4", name: "Prahlad Nagar", selected: true },
-  { id: "5", name: "Sindhu Bhavan", selected: true },
-]
-
-type Step = "auth" | "account" | "locations" | "success"
+interface GoogleLocation {
+  id: string
+  name: string
+  address: string
+  state: string
+}
 
 export default function ConnectModal({ platform, onClose }: Props) {
   const [step, setStep] = useState<Step>("auth")
-  const [authMethod, setAuthMethod] = useState<"email" | "phone" | null>(null)
-  const [authValue, setAuthValue] = useState("")
-  const [selectedAccount, setSelectedAccount] = useState<string | null>(null)
-  const [locations, setLocations] = useState(mockLocations)
+  const [loading, setLoading] = useState(false)
+  const [googleEmail, setGoogleEmail] = useState("")
+  const [apiKey, setApiKey] = useState("")
+  const [apiError, setApiError] = useState("")
+  const [locations, setLocations] = useState<GoogleLocation[]>([])
+  const [selectedLocations, setSelectedLocations] = useState<Set<string>>(new Set())
+  const [error, setError] = useState("")
   const { createIntegration } = useIntegrationStore()
-  const config = platformConfig[platform] || { name: platform, color: "#6B7280", icon: "?" }
+  const config = platformConfig[platform] || { name: platform, color: "#6B7280", icon: "?", apiUrl: "", helpUrl: "" }
 
-  const handleAuth = () => {
-    if (!authValue.trim()) return
-    setStep("account")
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const connected = params.get("google_connected")
+    const googleErr = params.get("google_error")
+
+    if (googleErr) {
+      setError("Google sign-in failed. Please try again.")
+      window.history.replaceState({}, "", "/overview")
+    }
+
+    if (connected) {
+      try {
+        const data = JSON.parse(decodeURIComponent(connected))
+        setGoogleEmail(data.email)
+        setStep("locations")
+        fetchLocations(data.access_token)
+      } catch {
+        setError("Failed to parse Google response")
+      }
+      window.history.replaceState({}, "", "/overview")
+    }
+  }, [])
+
+  const fetchLocations = async (token: string) => {
+    setLoading(true)
+    try {
+      const { data } = await apiClient.post("/google/fetch-locations", { access_token: token })
+      setLocations(data.locations || [])
+    } catch {
+      setError("Failed to fetch locations from Google")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleSelectAccount = (accountId: string) => {
-    setSelectedAccount(accountId)
-    setStep("locations")
+  const handleGoogleAuth = async () => {
+    setLoading(true)
+    setError("")
+    try {
+      const { data } = await apiClient.get("/google/auth-url")
+      window.location.href = data.url
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { detail?: string } } }
+      setError(axiosErr.response?.data?.detail || "Failed to start Google sign-in")
+      setLoading(false)
+    }
+  }
+
+  const handleVerifyApiKey = async () => {
+    if (!apiKey.trim()) return
+    setLoading(true)
+    setApiError("")
+    try {
+      const { data } = await apiClient.post(`/platforms/${platform}/verify`, { api_key: apiKey })
+      if (data.valid) {
+        setLocations(data.locations || [])
+        setStep("locations")
+      } else {
+        setApiError(data.message || "Invalid API key")
+      }
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { detail?: string } } }
+      setApiError(axiosErr.response?.data?.detail || "Failed to verify API key. Check your key and try again.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleToggleLocation = (id: string) => {
-    setLocations((prev) => prev.map((l) => l.id === id ? { ...l, selected: !l.selected } : l))
+    setSelectedLocations((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   const handleConnect = async () => {
-    const account = mockAccounts.find((a) => a.id === selectedAccount)
-    await createIntegration({ platform, account_name: account?.email || authValue })
-    setStep("success")
+    setLoading(true)
+    setError("")
+    try {
+      for (const _loc of locations.filter((l) => selectedLocations.has(l.id))) {
+        await createIntegration({
+          platform,
+          account_name: googleEmail || apiKey.slice(0, 8) + "...",
+        })
+      }
+      setStep("success")
+    } catch {
+      setError("Failed to connect")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -69,7 +141,7 @@ export default function ConnectModal({ platform, onClose }: Props) {
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {step !== "auth" && (
-              <button onClick={() => setStep(step === "locations" ? "account" : "auth")} className="rounded-xl p-1.5 text-white/50 hover:bg-white/10 hover:text-white transition-colors">
+              <button onClick={() => setStep("auth")} className="rounded-xl p-1.5 text-white/50 hover:bg-white/10 hover:text-white transition-colors">
                 <ArrowLeft className="h-4 w-4" />
               </button>
             )}
@@ -78,7 +150,6 @@ export default function ConnectModal({ platform, onClose }: Props) {
             </div>
             <span className="text-[16px] font-semibold text-white">
               {step === "auth" && `Connect ${config.name}`}
-              {step === "account" && "Select Account"}
               {step === "locations" && "Select Locations"}
               {step === "success" && "Connected!"}
             </span>
@@ -91,153 +162,141 @@ export default function ConnectModal({ platform, onClose }: Props) {
         {step === "auth" && (
           <div className="space-y-4">
             <p className="text-[13px] text-white/50">Sign in to your {config.name} Account</p>
+            {error && (
+              <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400">{error}</div>
+            )}
 
             {platform === "google" ? (
               <button
-                onClick={() => { setAuthValue("graphics@uppercrust.com"); setStep("account"); }}
-                className="flex w-full items-center gap-4 rounded-[16px] bg-white/5 p-5 text-left transition-all hover:bg-white/10 border border-white/5"
+                onClick={handleGoogleAuth}
+                disabled={loading}
+                className="flex w-full items-center gap-4 rounded-[16px] bg-white/5 p-5 text-left transition-all hover:bg-white/10 border border-white/5 disabled:opacity-50"
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-white">
-                  <span className="text-[20px] font-bold text-[#4A74FF]">G</span>
+                  {loading ? <Loader2 className="h-6 w-6 animate-spin text-[#4A74FF]" /> : <span className="text-[20px] font-bold text-[#4A74FF]">G</span>}
                 </div>
                 <div>
-                  <p className="text-[14px] font-semibold text-white">Continue with Google</p>
-                  <p className="text-[12px] text-white/40">Sign in with your Google account</p>
+                  <p className="text-[14px] font-semibold text-white">{loading ? "Redirecting to Google..." : "Continue with Google"}</p>
+                  <p className="text-[12px] text-white/40">Sign in with your Google Business account</p>
                 </div>
               </button>
             ) : (
-              <>
-                <div className="flex gap-2 rounded-[14px] bg-white/5 p-1">
-                  <button
-                    onClick={() => setAuthMethod("email")}
-                    className={cn("flex-1 rounded-[12px] px-4 py-2.5 text-[13px] font-medium transition-all", authMethod === "email" ? "bg-accent text-white" : "text-white/50 hover:text-white")}
-                  >
-                    Email
-                  </button>
-                  <button
-                    onClick={() => setAuthMethod("phone")}
-                    className={cn("flex-1 rounded-[12px] px-4 py-2.5 text-[13px] font-medium transition-all", authMethod === "phone" ? "bg-accent text-white" : "text-white/50 hover:text-white")}
-                  >
-                    Mobile
-                  </button>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 rounded-[16px] bg-white/5 p-5 border border-white/5">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-[14px]" style={{ backgroundColor: config.color + "20" }}>
+                    <Key className="h-6 w-6" style={{ color: config.color }} />
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-semibold text-white">Connect with API Key</p>
+                    <p className="text-[12px] text-white/40">Enter your {config.name} API key</p>
+                  </div>
                 </div>
 
-                {authMethod && (
-                  <div className="space-y-3">
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1.5 block text-[13px] font-medium text-white/70">API Key</label>
                     <input
-                      type={authMethod === "email" ? "email" : "tel"}
-                      value={authValue}
-                      onChange={(e) => setAuthValue(e.target.value)}
-                      placeholder={authMethod === "email" ? "you@gmail.com" : "+91 98765 43210"}
-                      className="w-full rounded-[14px] border border-white/10 bg-white/5 px-5 py-3.5 text-[14px] text-white placeholder-white/30 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors"
+                      type="text"
+                      value={apiKey}
+                      onChange={(e) => { setApiKey(e.target.value); setApiError("") }}
+                      placeholder={`Enter your ${config.name} API key`}
+                      className="w-full rounded-[14px] border border-white/10 bg-white/5 px-5 py-3.5 text-[14px] text-white placeholder-white/30 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors font-mono"
                     />
-                    <button
-                      onClick={handleAuth}
-                      disabled={!authValue.trim()}
-                      className="w-full rounded-[14px] bg-accent px-5 py-3.5 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
-                    >
-                      Continue
-                    </button>
                   </div>
-                )}
 
-                {!authMethod && (
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => { setAuthValue("user@example.com"); setStep("account"); }}
-                      className="flex w-full items-center gap-4 rounded-[16px] bg-white/5 p-5 text-left transition-all hover:bg-white/10 border border-white/5"
-                    >
-                      <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-card-blue">
-                        <Mail className="h-6 w-6 text-[#4A74FF]" />
-                      </div>
-                      <div>
-                        <p className="text-[14px] font-semibold text-white">Continue with Email</p>
-                        <p className="text-[12px] text-white/40">Sign in with email & password</p>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => { setAuthValue("+91 98765 43210"); setStep("account"); }}
-                      className="flex w-full items-center gap-4 rounded-[16px] bg-white/5 p-5 text-left transition-all hover:bg-white/10 border border-white/5"
-                    >
-                      <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-card-green">
-                        <Smartphone className="h-6 w-6 text-[#20C997]" />
-                      </div>
-                      <div>
-                        <p className="text-[14px] font-semibold text-white">Continue with Mobile</p>
-                        <p className="text-[12px] text-white/40">Verify with OTP</p>
-                      </div>
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
+                  {apiError && (
+                    <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400">{apiError}</div>
+                  )}
 
-        {step === "account" && (
-          <div className="space-y-3">
-            <p className="text-[13px] text-white/50 mb-4">Choose an account to connect</p>
-            {mockAccounts.map((account) => (
-              <button
-                key={account.id}
-                onClick={() => handleSelectAccount(account.id)}
-                className="flex w-full items-center justify-between rounded-[16px] bg-white/5 p-5 text-left transition-all hover:bg-white/10 border border-white/5"
-              >
-                <div>
-                  <p className="text-[14px] font-semibold text-white">{account.email}</p>
-                  <p className="text-[12px] text-white/40">{account.locations} Locations</p>
+                  {config.helpUrl && (
+                    <a
+                      href={config.helpUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-[12px] text-white/40 hover:text-white/60 transition-colors"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Get your API key from {config.name}
+                    </a>
+                  )}
+
+                  <button
+                    onClick={handleVerifyApiKey}
+                    disabled={!apiKey.trim() || loading}
+                    className="w-full rounded-[14px] bg-accent px-5 py-3.5 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
+                  >
+                    {loading ? "Verifying..." : "Verify & Connect"}
+                  </button>
                 </div>
-                <span className="text-[12px] text-white/30">→</span>
-              </button>
-            ))}
-            <button className="w-full rounded-[14px] border border-dashed border-white/20 px-5 py-3.5 text-[13px] font-medium text-white/50 transition-all hover:border-white/40 hover:text-white/70">
-              + Connect Another Account
-            </button>
+              </div>
+            )}
           </div>
         )}
 
         {step === "locations" && (
           <div className="space-y-4">
-            <p className="text-[13px] text-white/50">Select locations to sync reviews from</p>
-            <div className="space-y-2">
-              {locations.map((loc) => (
-                <button
-                  key={loc.id}
-                  onClick={() => handleToggleLocation(loc.id)}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-[14px] px-5 py-4 text-left transition-all border",
-                    loc.selected ? "bg-accent/10 border-accent/30" : "bg-white/5 border-white/5 hover:bg-white/10"
-                  )}
-                >
-                  <div className={cn(
-                    "flex h-5 w-5 items-center justify-center rounded-md border-2 transition-all",
-                    loc.selected ? "border-accent bg-accent" : "border-white/30"
-                  )}>
-                    {loc.selected && <span className="text-[10px] text-white">✓</span>}
-                  </div>
-                  <MapPin className="h-4 w-4 text-white/40" />
-                  <span className="text-[14px] font-medium text-white">{loc.name}</span>
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center justify-between pt-2">
-              <button
-                onClick={() => {
-                  const allSelected = locations.every((l) => l.selected)
-                  setLocations((prev) => prev.map((l) => ({ ...l, selected: !allSelected })))
-                }}
-                className="text-[13px] font-medium text-white/50 hover:text-white/70 transition-colors"
-              >
-                {locations.every((l) => l.selected) ? "Deselect All" : "Select All"}
-              </button>
-              <button
-                onClick={handleConnect}
-                disabled={locations.filter((l) => l.selected).length === 0}
-                className="rounded-[14px] bg-accent px-6 py-3 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
-              >
-                Connect {locations.filter((l) => l.selected).length} Locations
-              </button>
-            </div>
+            <p className="text-[13px] text-white/50">
+              {googleEmail ? `Signed in as ${googleEmail}` : "Select locations to sync reviews from"}
+            </p>
+            {error && (
+              <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400">{error}</div>
+            )}
+            {loading ? (
+              <div className="flex flex-col items-center gap-3 py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-accent" />
+                <p className="text-[13px] text-white/50">Fetching locations...</p>
+              </div>
+            ) : locations.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-8">
+                <MapPin className="h-8 w-8 text-white/20" />
+                <p className="text-[13px] text-white/50">No locations found for this account</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {locations.map((loc) => (
+                    <button
+                      key={loc.id}
+                      onClick={() => handleToggleLocation(loc.id)}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-[14px] px-5 py-4 text-left transition-all border",
+                        selectedLocations.has(loc.id) ? "bg-accent/10 border-accent/30" : "bg-white/5 border-white/5 hover:bg-white/10"
+                      )}
+                    >
+                      <div className={cn(
+                        "flex h-5 w-5 items-center justify-center rounded-md border-2 transition-all",
+                        selectedLocations.has(loc.id) ? "border-accent bg-accent" : "border-white/30"
+                      )}>
+                        {selectedLocations.has(loc.id) && <span className="text-[10px] text-white">✓</span>}
+                      </div>
+                      <MapPin className="h-4 w-4 text-white/40 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[14px] font-medium text-white truncate">{loc.name}</p>
+                        <p className="text-[11px] text-white/40 truncate">{loc.address}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    onClick={() => {
+                      if (selectedLocations.size === locations.length) setSelectedLocations(new Set())
+                      else setSelectedLocations(new Set(locations.map((l) => l.id)))
+                    }}
+                    className="text-[13px] font-medium text-white/50 hover:text-white/70 transition-colors"
+                  >
+                    {selectedLocations.size === locations.length ? "Deselect All" : "Select All"}
+                  </button>
+                  <button
+                    onClick={handleConnect}
+                    disabled={selectedLocations.size === 0 || loading}
+                    className="rounded-[14px] bg-accent px-6 py-3 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
+                  >
+                    {loading ? "Connecting..." : `Connect ${selectedLocations.size} Locations`}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -248,7 +307,7 @@ export default function ConnectModal({ platform, onClose }: Props) {
             </div>
             <p className="text-[18px] font-semibold text-white">Successfully Connected</p>
             <p className="mt-1 text-[13px] text-white/50">{config.name}</p>
-            <p className="mt-1 text-[12px] text-white/40">{locations.filter((l) => l.selected).length} Locations Connected</p>
+            <p className="mt-1 text-[12px] text-white/40">{selectedLocations.size} Locations Connected</p>
             <p className="mt-1 text-[11px] text-white/30">Last Sync: Just Now</p>
             <button
               onClick={onClose}

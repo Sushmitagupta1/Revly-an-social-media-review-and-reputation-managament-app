@@ -4,6 +4,7 @@ import InboxStats from "@/components/inbox/inbox-stats"
 import InboxCard from "@/components/inbox/inbox-card"
 import LoadingSpinner from "@/components/shared/loading-spinner"
 import EmptyState from "@/components/shared/empty-state"
+import BackButton from "@/components/shared/back-button"
 import { Button } from "@/components/ui/button"
 
 const TOPICS = [
@@ -21,6 +22,7 @@ export default function InboxPage() {
   return (
     <div className="space-y-6">
       <div>
+        <BackButton to="/overview" />
         <h1 className="text-2xl font-bold text-white">Inbox</h1>
         <p className="mt-1 text-sm text-text-secondary">Reviews that need your attention</p>
       </div>

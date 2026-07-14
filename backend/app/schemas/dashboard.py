@@ -79,3 +79,5 @@ class DashboardResponse(BaseModel):
     praises_by_location: list[PraiseLocation]
     complaints_trend: list[TrendPoint]
     praises_trend: list[TrendPoint]
+    complaint_topics: list[dict] = []
+    praise_topics: list[dict] = []

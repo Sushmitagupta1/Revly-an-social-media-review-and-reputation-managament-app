@@ -3,6 +3,7 @@ import { useAuditLogStore } from "@/stores/audit-log-store"
 import AuditLogList from "@/components/audit-logs/audit-log-list"
 import LoadingSpinner from "@/components/shared/loading-spinner"
 import EmptyState from "@/components/shared/empty-state"
+import BackButton from "@/components/shared/back-button"
 import { Badge } from "@/components/ui/badge"
 
 const ACTIONS = ["", "reply_sent", "review_resolved", "location_added", "competitor_tracked", "settings_updated", "integration_connected", "auto_reply_triggered"]
@@ -16,6 +17,7 @@ export default function AuditLogsPage() {
   return (
     <div className="space-y-6">
       <div>
+        <BackButton to="/overview" />
         <h1 className="text-2xl font-bold text-white">Audit Logs</h1>
         <p className="mt-1 text-sm text-text-secondary">Track all activity across your account</p>
       </div>

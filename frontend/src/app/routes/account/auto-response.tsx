@@ -4,6 +4,7 @@ import AutoResponseCard from "@/components/auto-response/auto-response-card"
 import AutoResponseForm from "@/components/auto-response/auto-response-form"
 import LoadingSpinner from "@/components/shared/loading-spinner"
 import EmptyState from "@/components/shared/empty-state"
+import BackButton from "@/components/shared/back-button"
 
 export default function AutoResponsePage() {
   const { responses, isLoading, fetchResponses, createResponse, updateResponse, deleteResponse } = useAutoResponseStore()
@@ -13,6 +14,7 @@ export default function AutoResponsePage() {
   return (
     <div className="space-y-6">
       <div>
+        <BackButton to="/account" />
         <h1 className="text-2xl font-bold text-white">Auto-Response Templates</h1>
         <p className="mt-1 text-sm text-text-secondary">Configure automated responses by sentiment and topic</p>
       </div>

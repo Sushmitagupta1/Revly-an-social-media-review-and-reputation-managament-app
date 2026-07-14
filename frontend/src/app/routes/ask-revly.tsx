@@ -5,6 +5,7 @@ import ChatMessage from "@/components/ai/chat-message"
 import ChatInput from "@/components/ai/chat-input"
 import SuggestedQuestions from "@/components/ai/suggested-questions"
 import LoadingSpinner from "@/components/shared/loading-spinner"
+import BackButton from "@/components/shared/back-button"
 
 export default function AskRevlyPage() {
   const { messages, suggestions, isLoading, fetchHistory, sendMessage, clearHistory } = useChatStore()
@@ -22,6 +23,7 @@ export default function AskRevlyPage() {
     <div className="flex h-[calc(100vh-4rem)] flex-col">
       <div className="flex items-center justify-between mb-4">
         <div>
+          <BackButton to="/overview" />
           <h1 className="text-2xl font-bold text-white">Ask Revly</h1>
           <p className="mt-1 text-sm text-text-secondary">AI-powered insights about your reviews</p>
         </div>

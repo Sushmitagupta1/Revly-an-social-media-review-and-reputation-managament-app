@@ -4,6 +4,7 @@ import AutomationCard from "@/components/automation/automation-card"
 import AutomationForm from "@/components/automation/automation-form"
 import LoadingSpinner from "@/components/shared/loading-spinner"
 import EmptyState from "@/components/shared/empty-state"
+import BackButton from "@/components/shared/back-button"
 
 export default function AutomationPage() {
   const { rules, isLoading, fetchRules, createRule, toggleRule, deleteRule } = useAutomationStore()
@@ -13,6 +14,7 @@ export default function AutomationPage() {
   return (
     <div className="space-y-6">
       <div>
+        <BackButton to="/overview" />
         <h1 className="text-2xl font-bold text-white">Automation</h1>
         <p className="mt-1 text-sm text-text-secondary">Set up rules to automate your review management</p>
       </div>

@@ -80,6 +80,8 @@ export default function OverviewPage() {
           praisesCount={data.praises_count}
           complaintsByLocation={data.complaints_by_location}
           praisesByLocation={data.praises_by_location}
+          complaintTopics={data.complaint_topics}
+          praiseTopics={data.praise_topics}
         />
       </div>
 

@@ -3,6 +3,7 @@ import { useNotificationStore } from "@/stores/notification-store"
 import NotificationList from "@/components/notifications/notification-list"
 import LoadingSpinner from "@/components/shared/loading-spinner"
 import EmptyState from "@/components/shared/empty-state"
+import BackButton from "@/components/shared/back-button"
 import { Badge } from "@/components/ui/badge"
 
 export default function NotificationsPage() {
@@ -14,6 +15,7 @@ export default function NotificationsPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <div>
+          <BackButton to="/overview" />
           <h1 className="text-2xl font-bold text-white">Notifications</h1>
           <p className="mt-1 text-sm text-text-secondary">Stay updated on your reputation</p>
         </div>

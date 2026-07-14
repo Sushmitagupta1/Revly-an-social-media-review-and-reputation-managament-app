@@ -1,46 +1,34 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { useNavigate } from "react-router-dom"
-import type { ComplaintLocation, PraiseLocation } from "@/types/dashboard"
+import type { ComplaintLocation, PraiseLocation, TopicCount } from "@/types/dashboard"
 
 interface ComplaintsPraisesProps {
   complaintsCount: number
   praisesCount: number
   complaintsByLocation: ComplaintLocation[]
   praisesByLocation: PraiseLocation[]
+  complaintTopics: TopicCount[]
+  praiseTopics: TopicCount[]
 }
-
-const complaintTopics = [
-  { topic: "Overpriced", count: 3 },
-  { topic: "Bad Taste", count: 2 },
-  { topic: "Stale Food", count: 1 },
-  { topic: "Slow Service", count: 1 },
-  { topic: "Poor Packaging", count: 1 },
-]
-
-const praiseTopics = [
-  { topic: "Good Taste", count: 7 },
-  { topic: "Friendly Staff", count: 5 },
-  { topic: "Fresh Food", count: 3 },
-  { topic: "Great Ambience", count: 2 },
-  { topic: "Quick Service", count: 2 },
-]
 
 export default function ComplaintsPraisesSection({
   complaintsCount,
   praisesCount,
   complaintsByLocation,
   praisesByLocation,
+  complaintTopics,
+  praiseTopics,
 }: ComplaintsPraisesProps) {
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-      <ComplaintsCard count={complaintsCount} locations={complaintsByLocation} />
-      <PraisesCard count={praisesCount} locations={praisesByLocation} />
+      <ComplaintsCard count={complaintsCount} locations={complaintsByLocation} topics={complaintTopics} />
+      <PraisesCard count={praisesCount} locations={praisesByLocation} topics={praiseTopics} />
     </div>
   )
 }
 
-function ComplaintsCard({ count, locations }: { count: number; locations: ComplaintLocation[] }) {
+function ComplaintsCard({ count, locations, topics }: { count: number; locations: ComplaintLocation[]; topics: TopicCount[] }) {
   const [view, setView] = useState<"location" | "brand">("location")
   const navigate = useNavigate()
   const maxCount = Math.max(...locations.map((l) => l.count), 1)
@@ -80,8 +68,8 @@ function ComplaintsCard({ count, locations }: { count: number; locations: Compla
                 </div>
               </div>
             ))
-          : complaintTopics.map((t) => {
-              const maxTopic = Math.max(...complaintTopics.map((x) => x.count), 1)
+          : topics.length > 0 ? topics.slice(0, 5).map((t) => {
+              const maxTopic = Math.max(...topics.map((x) => x.count), 1)
               return (
                 <div key={t.topic}>
                   <div className="mb-1 flex items-center justify-between">
@@ -93,14 +81,16 @@ function ComplaintsCard({ count, locations }: { count: number; locations: Compla
                   </div>
                 </div>
               )
-            })}
+            }) : (
+              <p className="text-[12px] text-text-secondary">No topic data available</p>
+            )}
       </div>
       <button onClick={() => navigate("/complaints")} className="mt-4 text-[12px] font-medium text-accent hover:underline">View all Complaints →</button>
     </div>
   )
 }
 
-function PraisesCard({ count, locations }: { count: number; locations: PraiseLocation[] }) {
+function PraisesCard({ count, locations, topics }: { count: number; locations: PraiseLocation[]; topics: TopicCount[] }) {
   const [view, setView] = useState<"location" | "brand">("location")
   const navigate = useNavigate()
   const maxCount = Math.max(...locations.map((l) => l.count), 1)
@@ -140,8 +130,8 @@ function PraisesCard({ count, locations }: { count: number; locations: PraiseLoc
                 </div>
               </div>
             ))
-          : praiseTopics.map((t) => {
-              const maxTopic = Math.max(...praiseTopics.map((x) => x.count), 1)
+          : topics.length > 0 ? topics.slice(0, 5).map((t) => {
+              const maxTopic = Math.max(...topics.map((x) => x.count), 1)
               return (
                 <div key={t.topic}>
                   <div className="mb-1 flex items-center justify-between">
@@ -153,7 +143,9 @@ function PraisesCard({ count, locations }: { count: number; locations: PraiseLoc
                   </div>
                 </div>
               )
-            })}
+            }) : (
+              <p className="text-[12px] text-text-secondary">No topic data available</p>
+            )}
       </div>
       <button onClick={() => navigate("/praises")} className="mt-4 text-[12px] font-medium text-accent hover:underline">View all Praises →</button>
     </div>

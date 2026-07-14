@@ -5,6 +5,7 @@ import SummaryCards from "@/components/integrations/summary-cards"
 import PlatformCard from "@/components/integrations/platform-card"
 import ConnectModal from "@/components/integrations/connect-modal"
 import ManagePlatform from "@/components/integrations/manage-platform"
+import BackButton from "@/components/shared/back-button"
 import { cn } from "@/lib/utils"
 
 const allPlatforms = [
@@ -48,6 +49,7 @@ export default function IntegrationsPage() {
   return (
     <div className="space-y-8 p-8">
       <div>
+        <BackButton to="/overview" />
         <h1 className="text-[28px] font-bold text-white">Platform Integration</h1>
         <p className="mt-1 text-[14px] text-white/50">Manage review platform connections</p>
       </div>
