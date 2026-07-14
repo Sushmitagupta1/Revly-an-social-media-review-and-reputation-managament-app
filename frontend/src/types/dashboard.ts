@@ -47,6 +47,11 @@ export interface PraiseLocation {
   count: number
 }
 
+export interface TopicCount {
+  topic: string
+  count: number
+}
+
 export interface RecentReview {
   id: string
   reviewer_name: string
