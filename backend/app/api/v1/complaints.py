@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query
 
 from app.api.deps import CurrentUser, DbSession
 from app.models.review import Review
+from app.core.constants import TOPIC_LABELS
 from app.schemas.review import ComplaintListResponse, ReviewResponse, TopicCount
 
 router = APIRouter()
@@ -16,18 +17,6 @@ def _resolve_location_ids(db, location_names: list[str]) -> list[str]:
     rows = db.query(Location.id, Location.name).all()
     name_to_id = {r.name: str(r.id) for r in rows}
     return [name_to_id[n] for n in location_names if n in name_to_id]
-
-
-TOPIC_LABELS = {
-    "food_quality": "Food Quality",
-    "service": "Service",
-    "delivery": "Delivery",
-    "pricing": "Pricing",
-    "staff": "Staff",
-    "ambience": "Ambience",
-    "cleanliness": "Cleanliness",
-    "wait_time": "Wait Time",
-}
 
 
 @router.get("", response_model=ComplaintListResponse)
@@ -42,6 +31,7 @@ def list_complaints(
 ):
     query = db.query(Review).filter(Review.sentiment == "negative")
 
+    loc_ids = None
     if location:
         filter_names = [n.strip() for n in location.split(",") if n.strip()]
         if filter_names:
@@ -54,16 +44,12 @@ def list_complaints(
     if resolved is not None:
         query = query.filter(Review.is_resolved == resolved)
 
-    all_negative = db.query(Review).filter(Review.sentiment == "negative")
-    if location:
-        filter_names = [n.strip() for n in location.split(",") if n.strip()]
-        if filter_names:
-            loc_ids = _resolve_location_ids(db, filter_names)
-            if loc_ids:
-                all_negative = all_negative.filter(Review.location_id.in_(loc_ids))
+    topic_query = db.query(Review).filter(Review.sentiment == "negative")
+    if loc_ids:
+        topic_query = topic_query.filter(Review.location_id.in_(loc_ids))
 
     topic_counter: Counter = Counter()
-    for r in all_negative.all():
+    for r in topic_query.yield_per(500):
         if r.topics:
             raw = r.topics
             if isinstance(raw, str):
