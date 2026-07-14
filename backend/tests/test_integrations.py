@@ -32,7 +32,7 @@ def _seed_integrations(db_session):
 def test_list_integrations(client, auth_headers):
     resp = client.get("/api/v1/integrations", headers=auth_headers)
     assert resp.status_code == 200
-    assert resp.json()["total"] == 5
+    assert resp.json()["total"] == 4
 
 
 def test_create_integration(client, auth_headers):
@@ -55,4 +55,4 @@ def test_delete_integration(client, auth_headers):
     iid = list_resp.json()["integrations"][0]["id"]
     resp = client.delete(f"/api/v1/integrations/{iid}", headers=auth_headers)
     assert resp.status_code == 200
-    assert client.get("/api/v1/integrations", headers=auth_headers).json()["total"] == 4
+    assert client.get("/api/v1/integrations", headers=auth_headers).json()["total"] == 3

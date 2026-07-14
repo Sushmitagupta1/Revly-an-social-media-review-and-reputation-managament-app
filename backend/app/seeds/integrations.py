@@ -4,10 +4,9 @@ from app.core.constants import MOCK_BRAND_ID
 
 INTEGRATIONS = [
     ("google", "Upper Crust - Google Business", "active", True),
-    ("yelp", "Upper Crust - Yelp", "active", True),
-    ("tripadvisor", "Upper Crust - TripAdvisor", "inactive", False),
-    ("facebook", "Upper Crust - Facebook", "active", True),
-    ("zomato", "Upper Crust - Zomato", "error", True),
+    ("zomato", "Upper Crust - Zomato", "active", True),
+    ("swiggy", "Upper Crust - Swiggy", "active", True),
+    ("reelo", "Upper Crust - Reelo", "active", True),
 ]
 
 

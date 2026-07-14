@@ -35,6 +35,18 @@ export interface LocationSummary {
   average_rating: number
 }
 
+export interface ComplaintLocation {
+  location_id: string
+  location_name: string
+  count: number
+}
+
+export interface PraiseLocation {
+  location_id: string
+  location_name: string
+  count: number
+}
+
 export interface RecentReview {
   id: string
   reviewer_name: string
@@ -55,4 +67,10 @@ export interface DashboardData {
   recent_reviews: RecentReview[]
   top_locations: LocationSummary[]
   bottom_locations: LocationSummary[]
+  complaints_count: number
+  praises_count: number
+  complaints_by_location: ComplaintLocation[]
+  praises_by_location: PraiseLocation[]
+  complaints_trend: TrendPoint[]
+  praises_trend: TrendPoint[]
 }

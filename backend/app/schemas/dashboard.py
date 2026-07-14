@@ -38,6 +38,18 @@ class LocationSummary(BaseModel):
     average_rating: float
 
 
+class ComplaintLocation(BaseModel):
+    location_id: str
+    location_name: str
+    count: int
+
+
+class PraiseLocation(BaseModel):
+    location_id: str
+    location_name: str
+    count: int
+
+
 class RecentReview(BaseModel):
     id: str
     reviewer_name: str
@@ -61,3 +73,9 @@ class DashboardResponse(BaseModel):
     recent_reviews: list[RecentReview]
     top_locations: list[LocationSummary]
     bottom_locations: list[LocationSummary]
+    complaints_count: int
+    praises_count: int
+    complaints_by_location: list[ComplaintLocation]
+    praises_by_location: list[PraiseLocation]
+    complaints_trend: list[TrendPoint]
+    praises_trend: list[TrendPoint]

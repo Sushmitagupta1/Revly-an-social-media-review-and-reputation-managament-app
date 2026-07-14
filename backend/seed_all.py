@@ -11,8 +11,10 @@ SQLiteTypeCompiler.visit_UUID = lambda self, type_, **kw: "CHAR(36)"
 
 from app.core.database import engine, Base, SessionLocal
 from app.core.constants import MOCK_BRAND_ID
+from app.core.security import hash_password
 
 # Import all models to register them with Base
+from app.models.role import Role
 from app.models.user import User
 from app.models.review import Review
 from app.models.reply import Reply
@@ -39,6 +41,31 @@ def seed_all():
         if db.query(Review).count() > 0:
             print("Database already has data. Skipping seed.")
             return
+
+        # Seed roles
+        print("Seeding roles...")
+        roles = ["admin", "manager", "viewer"]
+        for role_name in roles:
+            if not db.query(Role).filter(Role.name == role_name).first():
+                db.add(Role(name=role_name, permissions=[]))
+        db.commit()
+        print(f"Seeded {len(roles)} roles.")
+
+        # Seed default user
+        print("Seeding default user...")
+        admin_role = db.query(Role).filter(Role.name == "admin").first()
+        if not db.query(User).filter(User.email == "admin@uppercrust.com").first():
+            db.add(User(
+                email="admin@uppercrust.com",
+                full_name="Admin User",
+                password_hash=hash_password("password123"),
+                role_id=admin_role.id if admin_role else None,
+                is_active=True,
+            ))
+            db.commit()
+            print("Created admin@uppercrust.com / password123")
+        else:
+            print("Default user already exists.")
 
         print("Seeding reviews...")
         from app.seeds.reviews import seed_reviews

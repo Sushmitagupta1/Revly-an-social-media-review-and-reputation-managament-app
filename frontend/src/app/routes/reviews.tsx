@@ -4,13 +4,13 @@ import { useReviewStore } from "@/stores/review-store"
 import { downloadReviewsCsv } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import AiBanner from "@/components/reviews/ai-banner"
 import ReviewFilters from "@/components/reviews/review-filters"
 import ReviewCard from "@/components/reviews/review-card"
 import ReviewDetail from "@/components/reviews/review-detail"
 import ReviewStats from "@/components/reviews/review-stats"
 import LoadingSpinner from "@/components/shared/loading-spinner"
 import EmptyState from "@/components/shared/empty-state"
+import AskRevlyButton from "@/components/shared/ask-revly-button"
 import type { Review } from "@/types/review"
 
 export default function ReviewsPage() {
@@ -32,14 +32,15 @@ export default function ReviewsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Reviews</h1>
-        <p className="mt-1 text-sm text-text-secondary">Manage and respond to customer reviews</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Reviews</h1>
+          <p className="mt-1 text-sm text-text-secondary">Manage and respond to customer reviews</p>
+        </div>
+        <AskRevlyButton />
       </div>
 
       <ReviewStats stats={stats} />
-
-      <AiBanner />
 
       <div className="flex items-center gap-3">
         <div className="relative flex-1">

@@ -15,9 +15,15 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   fetchDashboard: async () => {
     set({ isLoading: true })
     try {
-      const { data } = await apiClient.get<DashboardData>("/dashboard")
+      const token = localStorage.getItem("access_token")
+      const { data } = await apiClient.get<DashboardData>("/dashboard", {
+        timeout: 10000,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      console.log("Dashboard data received:", Object.keys(data))
       set({ data, isLoading: false })
-    } catch {
+    } catch (err: any) {
+      console.error("Dashboard fetch failed:", err?.message, err?.code, err?.response?.status)
       set({ isLoading: false })
     }
   },

@@ -6,7 +6,7 @@ interface Props {
   onSubmit: (data: { platform: string; account_name: string }) => void
 }
 
-const PLATFORMS = ["google", "yelp", "tripadvisor", "facebook", "zomato", "reelo"]
+const PLATFORMS = ["google", "zomato", "swiggy", "reelo"]
 
 export default function IntegrationForm({ onSubmit }: Props) {
   const [platform, setPlatform] = useState("google")

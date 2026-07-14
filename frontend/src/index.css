@@ -4,41 +4,56 @@
   --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, monospace;
 
-  --color-primary: #0F172A;
-  --color-sidebar: #16213E;
-  --color-sidebar-hover: #2E4C9A;
-  --color-dashboard-bg: #0F163D;
-  --color-page-bg: #182A63;
+  --color-primary: #0F1835;
+  --color-sidebar: #162347;
+  --color-sidebar-hover: #1E2D5A;
+  --color-main-panel: #13224D;
+  --color-dashboard-bg: #0F1835;
+  --color-page-bg: #0F1835;
 
-  --color-card: #F8F8F6;
-  --color-card-secondary: #F3F5F8;
-  --color-card-blue: #DCEAFB;
-  --color-card-pink: #F8D7D9;
-  --color-card-yellow: #FFF1CF;
-  --color-card-green: #EDF7EF;
-  --color-surface: #FFFFFF;
-  --color-background: #F9FAFB;
+  --color-card: #FFF9F1;
+  --color-card-secondary: #FFF5EA;
+  --color-surface: #FFF9F1;
+  --color-background: #0F1835;
 
-  --color-success: #12B76A;
+  --color-success: #2FA86A;
+  --color-success-bg: #D1FAE5;
   --color-success-soft: #6FE5A6;
   --color-warning: #F59E0B;
+  --color-warning-bg: #FEF3C7;
   --color-warning-soft: #F8E38A;
-  --color-danger: #E53935;
-  --color-danger-soft: #F7C9C9;
-  --color-info: #4361EE;
+  --color-danger: #F56C6C;
+  --color-danger-bg: #FDE2E4;
+  --color-danger-soft: #F8B5AE;
+  --color-info: #6BA8FF;
+  --color-info-bg: #DCE8FF;
   --color-info-soft: #BFD8FF;
 
-  --color-accent: #FF5A1F;
+  --color-accent: #FF6A2B;
   --color-accent-teal: #0D8A74;
 
-  --color-text: #111827;
+  --color-text: #0F172A;
   --color-text-secondary: #6B7280;
   --color-text-muted: #9CA3AF;
-  --color-border: #E5E7EB;
+  --color-border: #E8EAF2;
+
+  --color-card-blue: #DCE8FF;
+  --color-card-green: #EDF7EE;
+  --color-card-mint: #D1FAE5;
+  --color-card-yellow: #FFF3CF;
+  --color-card-orange: #FFE7C7;
+  --color-card-peach: #FFE0C2;
+  --color-card-pink: #FDE2E4;
+  --color-card-rose: #FCE4EC;
+  --color-card-purple: #E9E1FF;
+  --color-card-lavender: #EDE9FE;
+  --color-card-cyan: #E6F8FD;
+  --color-card-white: #F8F8F6;
 }
 
 @layer base {
   body {
-    @apply bg-primary text-white font-sans antialiased;
+    @apply bg-background text-text font-sans antialiased;
+    font-size: 16.2px;
   }
 }

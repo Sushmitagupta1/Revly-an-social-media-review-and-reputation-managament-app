@@ -11,15 +11,13 @@ interface Props {
 
 const platformColors: Record<string, string> = {
   google: "bg-info/20 text-info",
-  yelp: "bg-danger/20 text-danger",
-  tripadvisor: "bg-success/20 text-success",
-  facebook: "bg-info/20 text-info",
   zomato: "bg-terracotta/20 text-terracotta",
+  swiggy: "bg-warning/20 text-warning",
   reelo: "bg-lavender/20 text-lavender",
 }
 
 const platformLogos: Record<string, string> = {
-  google: "G", yelp: "Y", tripadvisor: "T", facebook: "F", zomato: "Z", reelo: "R",
+  google: "G", zomato: "Z", swiggy: "S", reelo: "R",
 }
 
 export default function IntegrationCard({ integration, onToggle, onDelete }: Props) {
