@@ -260,8 +260,7 @@ Searchable review feed with AI reply generation, tone selection, and Ask Revly c
 
 ## License
 
-This project is proprietary software built for Upper Crust restaurant chain.
-
+This project is proprietary software built by sushmita gupta
 ---
 
 ## Author
