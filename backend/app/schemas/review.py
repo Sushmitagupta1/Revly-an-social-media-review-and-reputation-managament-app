@@ -39,6 +39,27 @@ class InboxResponse(BaseModel):
     pages: int
 
 
+class TopicCount(BaseModel):
+    topic: str
+    count: int
+
+
+class ComplaintListResponse(BaseModel):
+    reviews: list[ReviewResponse]
+    total: int
+    page: int
+    pages: int
+    topic_counts: list[TopicCount]
+
+
+class PraiseListResponse(BaseModel):
+    reviews: list[ReviewResponse]
+    total: int
+    page: int
+    pages: int
+    topic_counts: list[TopicCount]
+
+
 class ReviewStatsResponse(BaseModel):
     total: int
     average_rating: float
