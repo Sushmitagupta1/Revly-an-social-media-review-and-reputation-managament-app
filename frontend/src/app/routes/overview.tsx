@@ -86,7 +86,7 @@ export default function OverviewPage() {
       </div>
 
       <div>
-        <h2 className="mb-4 text-[17px] font-semibold text-text">Here's your reputation snapshot</h2>
+        <h2 className="mb-4 text-[17px] font-semibold text-white">Here's your reputation snapshot</h2>
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <NpsScoreCard score={data.nps_score} sentiment={data.sentiment_breakdown} />
           <RatingsBreakdown data={data.rating_distribution} totalReviews={data.kpis.total_reviews} />
