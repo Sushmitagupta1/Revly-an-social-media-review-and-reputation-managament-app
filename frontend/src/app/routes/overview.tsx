@@ -72,7 +72,7 @@ export default function OverviewPage() {
       <PlatformBreakdownCard data={data.platform_breakdown} />
 
       <div>
-        <h2 className="mb-4 text-[17px] font-semibold text-text">
+        <h2 className="mb-4 text-[17px] font-semibold text-white">
           Here's what your customers love and hate about you
         </h2>
         <ComplaintsPraisesSection
