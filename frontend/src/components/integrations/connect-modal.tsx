@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { X, ArrowLeft, CheckCircle, MapPin, Loader2, Key, ExternalLink } from "lucide-react"
+import { X, ArrowLeft, CheckCircle, MapPin, Loader2, Key, ExternalLink, Mail, Phone } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useIntegrationStore } from "@/stores/integration-store"
 import apiClient from "@/lib/api-client"
@@ -9,13 +9,13 @@ interface Props {
   onClose: () => void
 }
 
-const platformConfig: Record<string, { name: string; color: string; icon: string; apiUrl: string; helpUrl: string }> = {
-  google: { name: "Google Business", color: "#4A74FF", icon: "G", apiUrl: "", helpUrl: "https://developers.google.com/my-business" },
-  zomato: { name: "Zomato", color: "#E04F5F", icon: "Z", apiUrl: "https://developers.zomato.com/documentation", helpUrl: "https://developers.zomato.com" },
-  swiggy: { name: "Swiggy", color: "#FF8C00", icon: "S", apiUrl: "", helpUrl: "https://www.swiggy.com" },
-  reelo: { name: "Reelo", color: "#8B5CF6", icon: "R", apiUrl: "", helpUrl: "https://reelo.io" },
-  magicpin: { name: "Magicpin", color: "#20C997", icon: "M", apiUrl: "", helpUrl: "" },
-  tripadvisor: { name: "TripAdvisor", color: "#34E0A1", icon: "T", apiUrl: "", helpUrl: "" },
+const platformConfig: Record<string, { name: string; color: string; icon: string; apiUrl: string; helpUrl: string; authType: "api_key" | "email" | "phone" }> = {
+  google: { name: "Google Business", color: "#4A74FF", icon: "G", apiUrl: "", helpUrl: "https://developers.google.com/my-business", authType: "api_key" },
+  zomato: { name: "Zomato", color: "#E04F5F", icon: "Z", apiUrl: "", helpUrl: "", authType: "email" },
+  swiggy: { name: "Swiggy", color: "#FF8C00", icon: "S", apiUrl: "", helpUrl: "", authType: "phone" },
+  reelo: { name: "Reelo", color: "#8B5CF6", icon: "R", apiUrl: "", helpUrl: "https://reelo.io", authType: "api_key" },
+  magicpin: { name: "Magicpin", color: "#20C997", icon: "M", apiUrl: "", helpUrl: "", authType: "api_key" },
+  tripadvisor: { name: "TripAdvisor", color: "#34E0A1", icon: "T", apiUrl: "", helpUrl: "", authType: "api_key" },
 }
 
 type Step = "auth" | "locations" | "success"
@@ -32,6 +32,7 @@ export default function ConnectModal({ platform, onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [googleEmail, setGoogleEmail] = useState("")
   const [apiKey, setApiKey] = useState("")
+  const [credential, setCredential] = useState("")
   const [apiError, setApiError] = useState("")
   const [locations, setLocations] = useState<GoogleLocation[]>([])
   const [selectedLocations, setSelectedLocations] = useState<Set<string>>(new Set())
@@ -88,20 +89,22 @@ export default function ConnectModal({ platform, onClose }: Props) {
   }
 
   const handleVerifyApiKey = async () => {
-    if (!apiKey.trim()) return
+    const value = config.authType === "api_key" ? apiKey : credential
+    if (!value.trim()) return
     setLoading(true)
     setApiError("")
     try {
-      const { data } = await apiClient.post(`/platforms/${platform}/verify`, { api_key: apiKey })
+      const payload = config.authType === "api_key" ? { api_key: apiKey } : { credential: value, auth_type: config.authType }
+      const { data } = await apiClient.post(`/platforms/${platform}/verify`, payload)
       if (data.valid) {
         setLocations(data.locations || [])
         setStep("locations")
       } else {
-        setApiError(data.message || "Invalid API key")
+        setApiError(data.message || "Invalid credentials")
       }
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: string } } }
-      setApiError(axiosErr.response?.data?.detail || "Failed to verify API key. Check your key and try again.")
+      setApiError(axiosErr.response?.data?.detail || "Failed to verify. Check and try again.")
     } finally {
       setLoading(false)
     }
@@ -123,7 +126,7 @@ export default function ConnectModal({ platform, onClose }: Props) {
       for (const _loc of locations.filter((l) => selectedLocations.has(l.id))) {
         await createIntegration({
           platform,
-          account_name: googleEmail || apiKey.slice(0, 8) + "...",
+          account_name: googleEmail || credential || apiKey.slice(0, 8) + "...",
         })
       }
       setStep("success")
@@ -182,52 +185,109 @@ export default function ConnectModal({ platform, onClose }: Props) {
               </button>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center gap-3 rounded-[16px] bg-white/5 p-5 border border-white/5">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-[14px]" style={{ backgroundColor: config.color + "20" }}>
-                    <Key className="h-6 w-6" style={{ color: config.color }} />
-                  </div>
-                  <div>
-                    <p className="text-[14px] font-semibold text-white">Connect with API Key</p>
-                    <p className="text-[12px] text-white/40">Enter your {config.name} API key</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="mb-1.5 block text-[13px] font-medium text-white/70">API Key</label>
-                    <input
-                      type="text"
-                      value={apiKey}
-                      onChange={(e) => { setApiKey(e.target.value); setApiError("") }}
-                      placeholder={`Enter your ${config.name} API key`}
-                      className="w-full rounded-[14px] border border-white/10 bg-white/5 px-5 py-3.5 text-[14px] text-white placeholder-white/30 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors font-mono"
-                    />
-                  </div>
-
-                  {apiError && (
-                    <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400">{apiError}</div>
-                  )}
-
-                  {config.helpUrl && (
-                    <a
-                      href={config.helpUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-[12px] text-white/40 hover:text-white/60 transition-colors"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      Get your API key from {config.name}
-                    </a>
-                  )}
-
-                  <button
-                    onClick={handleVerifyApiKey}
-                    disabled={!apiKey.trim() || loading}
-                    className="w-full rounded-[14px] bg-accent px-5 py-3.5 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
-                  >
-                    {loading ? "Verifying..." : "Verify & Connect"}
-                  </button>
-                </div>
+                {config.authType === "email" ? (
+                  <>
+                    <div className="flex items-center gap-3 rounded-[16px] bg-white/5 p-5 border border-white/5">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-[14px]" style={{ backgroundColor: config.color + "20" }}>
+                        <Mail className="h-6 w-6" style={{ color: config.color }} />
+                      </div>
+                      <div>
+                        <p className="text-[14px] font-semibold text-white">Connect with Email</p>
+                        <p className="text-[12px] text-white/40">Enter your {config.name} registered email</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="mb-1.5 block text-[13px] font-medium text-white/70">Email Address</label>
+                        <input
+                          type="email"
+                          value={credential}
+                          onChange={(e) => { setCredential(e.target.value); setApiError("") }}
+                          placeholder={`your@email.com`}
+                          className="w-full rounded-[14px] border border-white/10 bg-white/5 px-5 py-3.5 text-[14px] text-white placeholder-white/30 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors"
+                        />
+                      </div>
+                      {apiError && <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400">{apiError}</div>}
+                      <button
+                        onClick={handleVerifyApiKey}
+                        disabled={!credential.trim() || loading}
+                        className="w-full rounded-[14px] bg-accent px-5 py-3.5 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
+                      >
+                        {loading ? "Connecting..." : "Connect Account"}
+                      </button>
+                    </div>
+                  </>
+                ) : config.authType === "phone" ? (
+                  <>
+                    <div className="flex items-center gap-3 rounded-[16px] bg-white/5 p-5 border border-white/5">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-[14px]" style={{ backgroundColor: config.color + "20" }}>
+                        <Phone className="h-6 w-6" style={{ color: config.color }} />
+                      </div>
+                      <div>
+                        <p className="text-[14px] font-semibold text-white">Connect with Phone</p>
+                        <p className="text-[12px] text-white/40">Enter your {config.name} registered phone number</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="mb-1.5 block text-[13px] font-medium text-white/70">Phone Number</label>
+                        <input
+                          type="tel"
+                          value={credential}
+                          onChange={(e) => { setCredential(e.target.value); setApiError("") }}
+                          placeholder="+91 98765 43210"
+                          className="w-full rounded-[14px] border border-white/10 bg-white/5 px-5 py-3.5 text-[14px] text-white placeholder-white/30 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors"
+                        />
+                      </div>
+                      {apiError && <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400">{apiError}</div>}
+                      <button
+                        onClick={handleVerifyApiKey}
+                        disabled={!credential.trim() || loading}
+                        className="w-full rounded-[14px] bg-accent px-5 py-3.5 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
+                      >
+                        {loading ? "Connecting..." : "Connect Account"}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3 rounded-[16px] bg-white/5 p-5 border border-white/5">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-[14px]" style={{ backgroundColor: config.color + "20" }}>
+                        <Key className="h-6 w-6" style={{ color: config.color }} />
+                      </div>
+                      <div>
+                        <p className="text-[14px] font-semibold text-white">Connect with API Key</p>
+                        <p className="text-[12px] text-white/40">Enter your {config.name} API key</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="mb-1.5 block text-[13px] font-medium text-white/70">API Key</label>
+                        <input
+                          type="text"
+                          value={apiKey}
+                          onChange={(e) => { setApiKey(e.target.value); setApiError("") }}
+                          placeholder={`Enter your ${config.name} API key`}
+                          className="w-full rounded-[14px] border border-white/10 bg-white/5 px-5 py-3.5 text-[14px] text-white placeholder-white/30 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors font-mono"
+                        />
+                      </div>
+                      {apiError && <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400">{apiError}</div>}
+                      {config.helpUrl && (
+                        <a href={config.helpUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[12px] text-white/40 hover:text-white/60 transition-colors">
+                          <ExternalLink className="h-3 w-3" />
+                          Get your API key from {config.name}
+                        </a>
+                      )}
+                      <button
+                        onClick={handleVerifyApiKey}
+                        disabled={!apiKey.trim() || loading}
+                        className="w-full rounded-[14px] bg-accent px-5 py-3.5 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
+                      >
+                        {loading ? "Verifying..." : "Verify & Connect"}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
