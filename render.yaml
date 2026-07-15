@@ -44,7 +44,7 @@ services:
         source: /*
         destination: /index.html
 
-  - type: postgresql
+  - type: pg
     name: revly-db
     plan: free
     databaseName: revly
