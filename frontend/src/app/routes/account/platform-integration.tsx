@@ -6,7 +6,7 @@ import PlatformCard from "@/components/integrations/platform-card"
 import ConnectModal from "@/components/integrations/connect-modal"
 import ManagePlatform from "@/components/integrations/manage-platform"
 import BackButton from "@/components/shared/back-button"
-import type { Integration } from "@/types/integration"
+// import type { Integration } from "@/types/integration"
 
 const allPlatforms = [
   { id: "google", name: "Google Business", icon: "G", color: "#4A74FF" },

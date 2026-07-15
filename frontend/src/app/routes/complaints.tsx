@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { useComplaintsStore } from "@/stores/complaints-store"
 import { useFilterStore } from "@/stores/filter-store"
 import ComplaintCard from "@/components/complaints/complaint-card"

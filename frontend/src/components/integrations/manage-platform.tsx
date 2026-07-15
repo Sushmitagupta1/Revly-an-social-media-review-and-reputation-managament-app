@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ArrowLeft, RefreshCw, Unplug, MapPin, Clock, Activity, Zap, Settings } from "lucide-react"
+import { ArrowLeft, RefreshCw, Unplug, MapPin, Activity, Zap, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Integration } from "@/types/integration"
 
