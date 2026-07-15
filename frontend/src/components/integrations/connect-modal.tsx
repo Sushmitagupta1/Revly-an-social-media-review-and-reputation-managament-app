@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { X, ArrowLeft, CheckCircle, MapPin, Loader2, Key, ExternalLink, Mail, Phone } from "lucide-react"
+import { X, ArrowLeft, CheckCircle, MapPin, Loader2, Key, ExternalLink, Mail, Phone, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useIntegrationStore } from "@/stores/integration-store"
 import apiClient from "@/lib/api-client"
@@ -9,18 +9,18 @@ interface Props {
   onClose: () => void
 }
 
-const platformConfig: Record<string, { name: string; color: string; icon: string; apiUrl: string; helpUrl: string; authType: "api_key" | "email" | "phone" }> = {
-  google: { name: "Google Business", color: "#4A74FF", icon: "G", apiUrl: "", helpUrl: "https://developers.google.com/my-business", authType: "api_key" },
-  zomato: { name: "Zomato", color: "#E04F5F", icon: "Z", apiUrl: "", helpUrl: "", authType: "phone" },
-  swiggy: { name: "Swiggy", color: "#FF8C00", icon: "S", apiUrl: "", helpUrl: "", authType: "phone" },
-  reelo: { name: "Reelo", color: "#8B5CF6", icon: "R", apiUrl: "", helpUrl: "", authType: "phone" },
-  magicpin: { name: "Magicpin", color: "#20C997", icon: "M", apiUrl: "", helpUrl: "", authType: "api_key" },
-  tripadvisor: { name: "TripAdvisor", color: "#34E0A1", icon: "T", apiUrl: "", helpUrl: "", authType: "api_key" },
+const platformConfig: Record<string, { name: string; color: string; icon: string; helpUrl: string; authType: "api_key" | "email" | "phone" }> = {
+  google: { name: "Google Business", color: "#4A74FF", icon: "G", helpUrl: "https://developers.google.com/my-business", authType: "api_key" },
+  zomato: { name: "Zomato", color: "#E04F5F", icon: "Z", helpUrl: "", authType: "phone" },
+  swiggy: { name: "Swiggy", color: "#FF8C00", icon: "S", helpUrl: "", authType: "phone" },
+  reelo: { name: "Reelo", color: "#8B5CF6", icon: "R", helpUrl: "", authType: "phone" },
+  magicpin: { name: "Magicpin", color: "#20C997", icon: "M", helpUrl: "", authType: "api_key" },
+  tripadvisor: { name: "TripAdvisor", color: "#34E0A1", icon: "T", helpUrl: "", authType: "api_key" },
 }
 
-type Step = "auth" | "locations" | "success"
+type Step = "auth" | "otp" | "locations" | "success"
 
-interface GoogleLocation {
+interface Location {
   id: string
   name: string
   address: string
@@ -33,12 +33,16 @@ export default function ConnectModal({ platform, onClose }: Props) {
   const [googleEmail, setGoogleEmail] = useState("")
   const [apiKey, setApiKey] = useState("")
   const [credential, setCredential] = useState("")
+  const [otp, setOtp] = useState(["", "", "", "", "", ""])
+  const [otpId, setOtpId] = useState("")
+  const [otpError, setOtpError] = useState("")
+  const [resendTimer, setResendTimer] = useState(30)
   const [apiError, setApiError] = useState("")
-  const [locations, setLocations] = useState<GoogleLocation[]>([])
+  const [locations, setLocations] = useState<Location[]>([])
   const [selectedLocations, setSelectedLocations] = useState<Set<string>>(new Set())
   const [error, setError] = useState("")
   const { createIntegration } = useIntegrationStore()
-  const config = platformConfig[platform] || { name: platform, color: "#6B7280", icon: "?", apiUrl: "", helpUrl: "" }
+  const config = platformConfig[platform] || { name: platform, color: "#6B7280", icon: "?", helpUrl: "", authType: "api_key" as const }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -62,6 +66,13 @@ export default function ConnectModal({ platform, onClose }: Props) {
       window.history.replaceState({}, "", "/overview")
     }
   }, [])
+
+  useEffect(() => {
+    if (step === "otp" && resendTimer > 0) {
+      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [step, resendTimer])
 
   const fetchLocations = async (token: string) => {
     setLoading(true)
@@ -88,19 +99,96 @@ export default function ConnectModal({ platform, onClose }: Props) {
     }
   }
 
-  const handleVerifyApiKey = async () => {
-    const value = config.authType === "api_key" ? apiKey : credential
-    if (!value.trim()) return
+  const handleSendOtp = async () => {
+    if (!credential.trim()) return
     setLoading(true)
     setApiError("")
     try {
-      const payload = config.authType === "api_key" ? { api_key: apiKey } : { credential: value, auth_type: config.authType }
-      const { data } = await apiClient.post(`/platforms/${platform}/verify`, payload)
+      const { data } = await apiClient.post(`/platforms/${platform}/send-otp`, { phone: credential })
+      if (data.success) {
+        setOtpId(data.otp_id || "")
+        setOtp(["", "", "", "", "", ""])
+        setResendTimer(30)
+        setStep("otp")
+      } else {
+        setApiError(data.message || "Failed to send OTP")
+      }
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { detail?: string } } }
+      setApiError(axiosErr.response?.data?.detail || "Failed to send OTP. Try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVerifyOtp = async () => {
+    const otpString = otp.join("")
+    if (otpString.length !== 6) return
+    setLoading(true)
+    setOtpError("")
+    try {
+      const { data } = await apiClient.post(`/platforms/${platform}/verify-otp`, {
+        phone: credential,
+        otp: otpString,
+        otp_id: otpId,
+      })
       if (data.valid) {
         setLocations(data.locations || [])
         setStep("locations")
       } else {
-        setApiError(data.message || "Invalid credentials")
+        setOtpError(data.message || "Invalid OTP. Please try again.")
+      }
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { detail?: string } } }
+      setOtpError(axiosErr.response?.data?.detail || "Invalid OTP")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    setResendTimer(30)
+    setLoading(true)
+    try {
+      await apiClient.post(`/platforms/${platform}/send-otp`, { phone: credential })
+    } catch {
+      setApiError("Failed to resend OTP")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (value.length > 1) value = value.slice(-1)
+    if (value && !/^\d$/.test(value)) return
+    const newOtp = [...otp]
+    newOtp[index] = value
+    setOtp(newOtp)
+    setOtpError("")
+    if (value && index < 5) {
+      const next = document.querySelector(`input[name="otp-${index + 1}"]`) as HTMLInputElement
+      next?.focus()
+    }
+  }
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      const prev = document.querySelector(`input[name="otp-${index - 1}"]`) as HTMLInputElement
+      prev?.focus()
+    }
+  }
+
+  const handleVerifyApiKey = async () => {
+    if (!apiKey.trim()) return
+    setLoading(true)
+    setApiError("")
+    try {
+      const { data } = await apiClient.post(`/platforms/${platform}/verify`, { api_key: apiKey })
+      if (data.valid) {
+        setLocations(data.locations || [])
+        setStep("locations")
+      } else {
+        setApiError(data.message || "Invalid API key")
       }
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: string } } }
@@ -126,7 +214,7 @@ export default function ConnectModal({ platform, onClose }: Props) {
       for (const _loc of locations.filter((l) => selectedLocations.has(l.id))) {
         await createIntegration({
           platform,
-          account_name: googleEmail || credential || apiKey.slice(0, 8) + "...",
+          account_name: credential || googleEmail || apiKey.slice(0, 8) + "...",
         })
       }
       setStep("success")
@@ -144,7 +232,7 @@ export default function ConnectModal({ platform, onClose }: Props) {
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {step !== "auth" && (
-              <button onClick={() => setStep("auth")} className="rounded-xl p-1.5 text-white/50 hover:bg-white/10 hover:text-white transition-colors">
+              <button onClick={() => step === "otp" ? setStep("auth") : setStep("auth")} className="rounded-xl p-1.5 text-white/50 hover:bg-white/10 hover:text-white transition-colors">
                 <ArrowLeft className="h-4 w-4" />
               </button>
             )}
@@ -153,6 +241,7 @@ export default function ConnectModal({ platform, onClose }: Props) {
             </div>
             <span className="text-[16px] font-semibold text-white">
               {step === "auth" && `Connect ${config.name}`}
+              {step === "otp" && "Verify OTP"}
               {step === "locations" && "Select Locations"}
               {step === "success" && "Connected!"}
             </span>
@@ -183,130 +272,134 @@ export default function ConnectModal({ platform, onClose }: Props) {
                   <p className="text-[12px] text-white/40">Sign in with your Google Business account</p>
                 </div>
               </button>
+            ) : config.authType === "phone" ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 rounded-[16px] bg-white/5 p-5 border border-white/5">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-[14px]" style={{ backgroundColor: config.color + "20" }}>
+                    <Phone className="h-6 w-6" style={{ color: config.color }} />
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-semibold text-white">Login with Phone Number</p>
+                    <p className="text-[12px] text-white/40">We'll send an OTP to verify your {config.name} account</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1.5 block text-[13px] font-medium text-white/70">Phone Number</label>
+                    <input
+                      type="tel"
+                      value={credential}
+                      onChange={(e) => { setCredential(e.target.value); setApiError("") }}
+                      placeholder="+91 98765 43210"
+                      className="w-full rounded-[14px] border border-white/10 bg-white/5 px-5 py-3.5 text-[14px] text-white placeholder-white/30 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors"
+                    />
+                  </div>
+                  {apiError && <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400">{apiError}</div>}
+                  <button
+                    onClick={handleSendOtp}
+                    disabled={!credential.trim() || loading}
+                    className="w-full rounded-[14px] bg-accent px-5 py-3.5 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
+                  >
+                    {loading ? "Sending OTP..." : "Send OTP"}
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="space-y-4">
-                {config.authType === "email" ? (
-                  <>
-                    <div className="flex items-center gap-3 rounded-[16px] bg-white/5 p-5 border border-white/5">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-[14px]" style={{ backgroundColor: config.color + "20" }}>
-                        <Mail className="h-6 w-6" style={{ color: config.color }} />
-                      </div>
-                      <div>
-                        <p className="text-[14px] font-semibold text-white">Connect with Email</p>
-                        <p className="text-[12px] text-white/40">Enter your {config.name} registered email</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="mb-1.5 block text-[13px] font-medium text-white/70">Email Address</label>
-                        <input
-                          type="email"
-                          value={credential}
-                          onChange={(e) => { setCredential(e.target.value); setApiError("") }}
-                          placeholder={`your@email.com`}
-                          className="w-full rounded-[14px] border border-white/10 bg-white/5 px-5 py-3.5 text-[14px] text-white placeholder-white/30 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors"
-                        />
-                      </div>
-                      {apiError && <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400">{apiError}</div>}
-                      <button
-                        onClick={handleVerifyApiKey}
-                        disabled={!credential.trim() || loading}
-                        className="w-full rounded-[14px] bg-accent px-5 py-3.5 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
-                      >
-                        {loading ? "Connecting..." : "Connect Account"}
-                      </button>
-                    </div>
-                  </>
-                ) : config.authType === "phone" ? (
-                  <>
-                    <div className="flex items-center gap-3 rounded-[16px] bg-white/5 p-5 border border-white/5">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-[14px]" style={{ backgroundColor: config.color + "20" }}>
-                        <Phone className="h-6 w-6" style={{ color: config.color }} />
-                      </div>
-                      <div>
-                        <p className="text-[14px] font-semibold text-white">Connect with Phone</p>
-                        <p className="text-[12px] text-white/40">Enter your {config.name} registered phone number</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="mb-1.5 block text-[13px] font-medium text-white/70">Phone Number</label>
-                        <input
-                          type="tel"
-                          value={credential}
-                          onChange={(e) => { setCredential(e.target.value); setApiError("") }}
-                          placeholder="+91 98765 43210"
-                          className="w-full rounded-[14px] border border-white/10 bg-white/5 px-5 py-3.5 text-[14px] text-white placeholder-white/30 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors"
-                        />
-                      </div>
-                      {apiError && <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400">{apiError}</div>}
-                      <button
-                        onClick={handleVerifyApiKey}
-                        disabled={!credential.trim() || loading}
-                        className="w-full rounded-[14px] bg-accent px-5 py-3.5 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
-                      >
-                        {loading ? "Connecting..." : "Connect Account"}
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-3 rounded-[16px] bg-white/5 p-5 border border-white/5">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-[14px]" style={{ backgroundColor: config.color + "20" }}>
-                        <Key className="h-6 w-6" style={{ color: config.color }} />
-                      </div>
-                      <div>
-                        <p className="text-[14px] font-semibold text-white">Connect with API Key</p>
-                        <p className="text-[12px] text-white/40">Enter your {config.name} API key</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="mb-1.5 block text-[13px] font-medium text-white/70">API Key</label>
-                        <input
-                          type="text"
-                          value={apiKey}
-                          onChange={(e) => { setApiKey(e.target.value); setApiError("") }}
-                          placeholder={`Enter your ${config.name} API key`}
-                          className="w-full rounded-[14px] border border-white/10 bg-white/5 px-5 py-3.5 text-[14px] text-white placeholder-white/30 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors font-mono"
-                        />
-                      </div>
-                      {apiError && <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400">{apiError}</div>}
-                      {config.helpUrl && (
-                        <a href={config.helpUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[12px] text-white/40 hover:text-white/60 transition-colors">
-                          <ExternalLink className="h-3 w-3" />
-                          Get your API key from {config.name}
-                        </a>
-                      )}
-                      <button
-                        onClick={handleVerifyApiKey}
-                        disabled={!apiKey.trim() || loading}
-                        className="w-full rounded-[14px] bg-accent px-5 py-3.5 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
-                      >
-                        {loading ? "Verifying..." : "Verify & Connect"}
-                      </button>
-                    </div>
-                  </>
-                )}
+                <div className="flex items-center gap-3 rounded-[16px] bg-white/5 p-5 border border-white/5">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-[14px]" style={{ backgroundColor: config.color + "20" }}>
+                    <Key className="h-6 w-6" style={{ color: config.color }} />
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-semibold text-white">Connect with API Key</p>
+                    <p className="text-[12px] text-white/40">Enter your {config.name} API key</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1.5 block text-[13px] font-medium text-white/70">API Key</label>
+                    <input
+                      type="text"
+                      value={apiKey}
+                      onChange={(e) => { setApiKey(e.target.value); setApiError("") }}
+                      placeholder={`Enter your ${config.name} API key`}
+                      className="w-full rounded-[14px] border border-white/10 bg-white/5 px-5 py-3.5 text-[14px] text-white placeholder-white/30 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors font-mono"
+                    />
+                  </div>
+                  {apiError && <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400">{apiError}</div>}
+                  {config.helpUrl && (
+                    <a href={config.helpUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[12px] text-white/40 hover:text-white/60 transition-colors">
+                      <ExternalLink className="h-3 w-3" />
+                      Get your API key from {config.name}
+                    </a>
+                  )}
+                  <button
+                    onClick={handleVerifyApiKey}
+                    disabled={!apiKey.trim() || loading}
+                    className="w-full rounded-[14px] bg-accent px-5 py-3.5 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
+                  >
+                    {loading ? "Verifying..." : "Verify & Connect"}
+                  </button>
+                </div>
               </div>
             )}
+          </div>
+        )}
+
+        {step === "otp" && (
+          <div className="space-y-5">
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ backgroundColor: config.color + "20" }}>
+                <Shield className="h-7 w-7" style={{ color: config.color }} />
+              </div>
+              <p className="text-[13px] text-white/50 text-center">
+                OTP sent to <span className="font-medium text-white">{credential}</span>
+              </p>
+            </div>
+            <div className="flex justify-center gap-3">
+              {otp.map((digit, i) => (
+                <input
+                  key={i}
+                  name={`otp-${i}`}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleOtpChange(i, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                  className="h-12 w-11 rounded-[12px] border border-white/10 bg-white/5 text-center text-[18px] font-bold text-white placeholder-white/20 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors"
+                />
+              ))}
+            </div>
+            {otpError && <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400 text-center">{otpError}</div>}
+            <div className="text-center">
+              {resendTimer > 0 ? (
+                <p className="text-[12px] text-white/40">Resend OTP in {resendTimer}s</p>
+              ) : (
+                <button onClick={handleResendOtp} className="text-[12px] text-accent hover:text-accent/80 font-medium transition-colors">
+                  Resend OTP
+                </button>
+              )}
+            </div>
+            <button
+              onClick={handleVerifyOtp}
+              disabled={otp.join("").length !== 6 || loading}
+              className="w-full rounded-[14px] bg-accent px-5 py-3.5 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
+            >
+              {loading ? "Verifying..." : "Verify OTP"}
+            </button>
           </div>
         )}
 
         {step === "locations" && (
           <div className="space-y-4">
             <p className="text-[13px] text-white/50">
-              {googleEmail ? `Signed in as ${googleEmail}` : "Select locations to sync reviews from"}
+              {googleEmail ? `Signed in as ${googleEmail}` : `Select locations from your ${config.name} account`}
             </p>
             {error && (
               <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400">{error}</div>
             )}
-            {loading ? (
-              <div className="flex flex-col items-center gap-3 py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-accent" />
-                <p className="text-[13px] text-white/50">Fetching locations...</p>
-              </div>
-            ) : locations.length === 0 ? (
+            {locations.length === 0 ? (
               <div className="flex flex-col items-center gap-3 py-8">
                 <MapPin className="h-8 w-8 text-white/20" />
                 <p className="text-[13px] text-white/50">No locations found for this account</p>
@@ -352,7 +445,7 @@ export default function ConnectModal({ platform, onClose }: Props) {
                     disabled={selectedLocations.size === 0 || loading}
                     className="rounded-[14px] bg-accent px-6 py-3 text-[14px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
                   >
-                    {loading ? "Connecting..." : `Connect ${selectedLocations.size} Locations`}
+                    {loading ? "Connecting..." : `Connect ${selectedLocations.size} Location${selectedLocations.size > 1 ? "s" : ""}`}
                   </button>
                 </div>
               </>
@@ -367,7 +460,7 @@ export default function ConnectModal({ platform, onClose }: Props) {
             </div>
             <p className="text-[18px] font-semibold text-white">Successfully Connected</p>
             <p className="mt-1 text-[13px] text-white/50">{config.name}</p>
-            <p className="mt-1 text-[12px] text-white/40">{selectedLocations.size} Locations Connected</p>
+            <p className="mt-1 text-[12px] text-white/40">{selectedLocations.size} Location{selectedLocations.size > 1 ? "s" : ""} Connected</p>
             <p className="mt-1 text-[11px] text-white/30">Last Sync: Just Now</p>
             <button
               onClick={onClose}
