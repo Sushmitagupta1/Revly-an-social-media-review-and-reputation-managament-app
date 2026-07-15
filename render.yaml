@@ -1,0 +1,51 @@
+services:
+  - type: web
+    name: revly-backend
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: Dockerfile
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: revly-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        fromService:
+          name: revly-frontend
+          property: url
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.12"
+    healthCheckPath: /health
+    autoDeploy: true
+
+  - type: web
+    name: revly-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: revly-backend
+          property: url
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  - type: pgsql
+    name: revly-db
+    plan: free
+    databaseName: revly
+    user: revly
