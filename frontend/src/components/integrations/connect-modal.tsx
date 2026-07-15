@@ -211,12 +211,16 @@ export default function ConnectModal({ platform, onClose }: Props) {
     setLoading(true)
     setError("")
     try {
-      for (const _loc of locations.filter((l) => selectedLocations.has(l.id))) {
-        await createIntegration({
-          platform,
-          account_name: credential || googleEmail || apiKey.slice(0, 8) + "...",
-        })
-      }
+      await apiClient.post("/platforms/connect-locations", {
+        platform,
+        phone: credential || "",
+        account_name: credential || googleEmail || apiKey.slice(0, 8) + "...",
+        location_ids: Array.from(selectedLocations),
+      })
+      await createIntegration({
+        platform,
+        account_name: credential || googleEmail || apiKey.slice(0, 8) + "...",
+      })
       setStep("success")
     } catch {
       setError("Failed to connect")

@@ -12,5 +12,6 @@ from app.models.automation_rule import AutomationRule
 from app.models.auto_response import AutoResponse
 from app.models.integration import Integration
 from app.models.resolve_policy import ResolvePolicy
+from app.models.platform_token import PlatformToken
 
-__all__ = ["Base", "Role", "User", "Review", "Reply", "ChatMessage", "Competitor", "Notification", "Location", "AuditLog", "AutomationRule", "AutoResponse", "Integration", "ResolvePolicy"]
+__all__ = ["Base", "Role", "User", "Review", "Reply", "ChatMessage", "Competitor", "Notification", "Location", "AuditLog", "AutomationRule", "AutoResponse", "Integration", "ResolvePolicy", "PlatformToken"]
