@@ -1,5 +1,5 @@
 export const API_BASE_URL = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api/v1`
+  ? `${import.meta.env.VITE_API_URL.replace(/\/+$/, "")}/api/v1`
   : "https://revly-an-social-media-review-and.onrender.com/api/v1"
 
 export const ROUTES = {
