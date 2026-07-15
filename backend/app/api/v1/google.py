@@ -37,7 +37,7 @@ def get_google_auth_url():
 
 @router.get("/callback")
 async def google_callback(code: str = "", error: str = ""):
-    frontend_base = "http://172.20.10.9:5173"
+    frontend_base = "https://revly-an-social-media-review-and-re.vercel.app"
     if error:
         return RedirectResponse(url=f"{frontend_base}/overview?google_error={error}")
     if not code:
