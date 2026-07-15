@@ -24,12 +24,12 @@ export default function PlatformCard({ integration, config, onManage }: Props) {
 
       <div className="mt-4 flex items-center justify-between">
         <div>
-          <p className="text-[11px] text-white/40">15 Locations</p>
+          <p className="text-[11px] text-white/40">No Locations</p>
           <div className="mt-1 flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-[#20C997]" />
             <span className="text-[11px] font-medium text-[#20C997]">Connected</span>
           </div>
-          <p className="mt-1 text-[10px] text-white/30">Last Sync: 2 mins ago</p>
+          <p className="mt-1 text-[10px] text-white/30">Last Sync: Never</p>
         </div>
         <button
           onClick={onManage}

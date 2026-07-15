@@ -56,7 +56,7 @@ export default function PlatformIntegrationPage() {
         <div className="flex h-64 items-center justify-center"><LoadingSpinner /></div>
       ) : (
         <>
-          <SummaryCards connectedCount={connectedCount} totalLocations={19} lastSync="2 minutes ago" />
+          <SummaryCards connectedCount={connectedCount} totalLocations={0} lastSync="Never" />
 
           <div>
             <h2 className="mb-4 text-[16px] font-semibold text-white">Connected Platforms</h2>

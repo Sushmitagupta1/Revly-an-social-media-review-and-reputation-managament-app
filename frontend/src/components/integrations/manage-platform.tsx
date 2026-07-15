@@ -15,17 +15,9 @@ const platformConfig: Record<string, { name: string; color: string; icon: string
   reelo: { name: "Reelo", color: "#8B5CF6", icon: "R" },
 }
 
-const mockLocations = [
-  { id: "1", name: "Upper Crust Vastrapur", connected: true },
-  { id: "2", name: "Upper Crust Vijay Cross", connected: true },
-  { id: "3", name: "Sindhu Bhavan", connected: true },
-  { id: "4", name: "Prahlad Nagar", connected: true },
-  { id: "5", name: "New Outlet", connected: false },
-]
-
 export default function ManagePlatform({ integration, onBack }: Props) {
   const [autoSync, setAutoSync] = useState(true)
-  const [locations, setLocations] = useState(mockLocations)
+  const [locations, setLocations] = useState<Array<{ id: string; name: string; connected: boolean }>>([])
   const platform = integration?.platform || "google"
   const config = platformConfig[platform] || { name: platform, color: "#6B7280", icon: "?" }
 
@@ -34,10 +26,10 @@ export default function ManagePlatform({ integration, onBack }: Props) {
   }
 
   const syncStats = [
-    { label: "Today's Reviews", value: "46", icon: Activity, color: "#4A74FF" },
-    { label: "Negative Reviews", value: "6", icon: Activity, color: "#E04F5F" },
-    { label: "Pending Responses", value: "3", icon: Activity, color: "#F59E0B" },
-    { label: "Average Rating", value: "4.5", icon: Activity, color: "#20C997" },
+    { label: "Today's Reviews", value: "0", icon: Activity, color: "#4A74FF" },
+    { label: "Negative Reviews", value: "0", icon: Activity, color: "#E04F5F" },
+    { label: "Pending Responses", value: "0", icon: Activity, color: "#F59E0B" },
+    { label: "Average Rating", value: "-", icon: Activity, color: "#20C997" },
   ]
 
   return (
@@ -52,7 +44,7 @@ export default function ManagePlatform({ integration, onBack }: Props) {
           </div>
           <div>
             <h1 className="text-[24px] font-bold text-white">{config.name}</h1>
-            <p className="text-[13px] text-white/50">{integration?.account_name || "graphics@uppercrust.com"}</p>
+            <p className="text-[13px] text-white/50">{integration?.account_name || "Not connected"}</p>
           </div>
         </div>
       </div>
@@ -71,38 +63,45 @@ export default function ManagePlatform({ integration, onBack }: Props) {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[13px] text-white/50">Last Sync</span>
-                <span className="text-[13px] text-white">2 minutes ago</span>
+                <span className="text-[13px] text-white">Never</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[13px] text-white/50">Sync Health</span>
-                <span className="text-[13px] text-[#20C997]">Healthy</span>
+                <span className="text-[13px] text-white/50">Not synced yet</span>
               </div>
             </div>
           </div>
 
           <div className="rounded-[20px] bg-white/5 p-6 border border-white/5">
             <h3 className="mb-4 text-[15px] font-semibold text-white">Connected Locations</h3>
-            <div className="space-y-2">
-              {locations.map((loc) => (
-                <button
-                  key={loc.id}
-                  onClick={() => toggleLocation(loc.id)}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left transition-all border",
-                    loc.connected ? "bg-accent/10 border-accent/30" : "bg-white/5 border-white/5"
-                  )}
-                >
-                  <div className={cn(
-                    "flex h-4 w-4 items-center justify-center rounded-md border-2 transition-all",
-                    loc.connected ? "border-accent bg-accent" : "border-white/30"
-                  )}>
-                    {loc.connected && <span className="text-[8px] text-white">✓</span>}
-                  </div>
-                  <MapPin className="h-3.5 w-3.5 text-white/40" />
-                  <span className="text-[13px] font-medium text-white">{loc.name}</span>
-                </button>
-              ))}
-            </div>
+            {locations.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-8">
+                <MapPin className="h-8 w-8 text-white/20" />
+                <p className="text-[13px] text-white/50">No locations connected</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {locations.map((loc) => (
+                  <button
+                    key={loc.id}
+                    onClick={() => toggleLocation(loc.id)}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left transition-all border",
+                      loc.connected ? "bg-accent/10 border-accent/30" : "bg-white/5 border-white/5"
+                    )}
+                  >
+                    <div className={cn(
+                      "flex h-4 w-4 items-center justify-center rounded-md border-2 transition-all",
+                      loc.connected ? "border-accent bg-accent" : "border-white/30"
+                    )}>
+                      {loc.connected && <span className="text-[8px] text-white">✓</span>}
+                    </div>
+                    <MapPin className="h-3.5 w-3.5 text-white/40" />
+                    <span className="text-[13px] font-medium text-white">{loc.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -123,7 +122,7 @@ export default function ManagePlatform({ integration, onBack }: Props) {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-[15px] font-semibold text-white">Auto Sync</h3>
-                <p className="mt-0.5 text-[12px] text-white/40">Every 15 minutes</p>
+                <p className="mt-0.5 text-[12px] text-white/40">Auto-sync reviews when available</p>
               </div>
               <button
                 onClick={() => setAutoSync(!autoSync)}
