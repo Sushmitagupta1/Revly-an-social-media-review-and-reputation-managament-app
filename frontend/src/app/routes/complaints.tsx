@@ -125,7 +125,7 @@ export default function ComplaintsPage() {
                       <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${(t.count / maxTopicCount) * 100}%` }} />
                     </div>
                   </div>
-                ))}
+                )) : <p className="text-[13px] text-text-secondary">No data available</p>}
               </div>
             </div>
           </div>
