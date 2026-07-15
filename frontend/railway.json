@@ -6,7 +6,6 @@
     "outputDirectory": "dist"
   },
   "deploy": {
-    "startCommand": "npx serve -s dist -l $PORT",
-    "healthcheckPath": "/"
+    "startCommand": "npx serve -s dist -l $PORT"
   }
 }
