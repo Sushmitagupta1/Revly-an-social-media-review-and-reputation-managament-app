@@ -6,15 +6,11 @@ services:
     dockerfilePath: Dockerfile
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: revly-db
-          property: connectionString
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGINS
-        fromService:
-          name: revly-frontend
-          property: url
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: GOOGLE_CLIENT_ID
@@ -36,16 +32,8 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        fromService:
-          name: revly-backend
-          property: url
+        sync: false
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
-
-  - type: pg
-    name: revly-db
-    plan: free
-    databaseName: revly
-    user: revly
