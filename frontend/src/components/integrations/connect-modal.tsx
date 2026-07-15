@@ -11,9 +11,9 @@ interface Props {
 
 const platformConfig: Record<string, { name: string; color: string; icon: string; apiUrl: string; helpUrl: string; authType: "api_key" | "email" | "phone" }> = {
   google: { name: "Google Business", color: "#4A74FF", icon: "G", apiUrl: "", helpUrl: "https://developers.google.com/my-business", authType: "api_key" },
-  zomato: { name: "Zomato", color: "#E04F5F", icon: "Z", apiUrl: "", helpUrl: "", authType: "email" },
+  zomato: { name: "Zomato", color: "#E04F5F", icon: "Z", apiUrl: "", helpUrl: "", authType: "phone" },
   swiggy: { name: "Swiggy", color: "#FF8C00", icon: "S", apiUrl: "", helpUrl: "", authType: "phone" },
-  reelo: { name: "Reelo", color: "#8B5CF6", icon: "R", apiUrl: "", helpUrl: "https://reelo.io", authType: "api_key" },
+  reelo: { name: "Reelo", color: "#8B5CF6", icon: "R", apiUrl: "", helpUrl: "", authType: "phone" },
   magicpin: { name: "Magicpin", color: "#20C997", icon: "M", apiUrl: "", helpUrl: "", authType: "api_key" },
   tripadvisor: { name: "TripAdvisor", color: "#34E0A1", icon: "T", apiUrl: "", helpUrl: "", authType: "api_key" },
 }

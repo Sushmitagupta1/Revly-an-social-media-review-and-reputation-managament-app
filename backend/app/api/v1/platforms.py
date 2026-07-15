@@ -17,30 +17,12 @@ ZOMATO_API_BASE = "https://developers.zomato.com/api/v2.1"
 
 @router.post("/zomato/verify")
 async def verify_zomato(body: PlatformVerifyRequest):
-    if body.api_key:
-        async with httpx.AsyncClient() as client:
-            try:
-                resp = await client.get(
-                    f"{ZOMATO_API_BASE}/categories",
-                    headers={"user-key": body.api_key},
-                    timeout=10.0,
-                )
-                if resp.status_code == 200:
-                    return {"valid": True, "message": "API key verified", "locations": []}
-                elif resp.status_code == 403:
-                    return {"valid": False, "message": "Invalid API key", "locations": []}
-                else:
-                    return {"valid": False, "message": f"Verification failed: {resp.status_code}", "locations": []}
-            except httpx.TimeoutException:
-                return {"valid": False, "message": "Connection timeout. Check your network.", "locations": []}
-            except Exception as e:
-                return {"valid": False, "message": f"Error: {str(e)}", "locations": []}
-    elif body.credential:
-        if body.auth_type == "email":
-            return {"valid": True, "message": f"Zomato account connected via {body.credential}", "locations": []}
-        return {"valid": True, "message": "Zomato account connected", "locations": []}
+    if body.credential:
+        return {"valid": True, "message": f"Zomato account connected via {body.credential}", "locations": []}
+    elif body.api_key:
+        return {"valid": True, "message": "Zomato API key saved.", "locations": []}
     else:
-        raise HTTPException(status_code=400, detail="API key or credential is required")
+        raise HTTPException(status_code=400, detail="Phone number or credential is required")
 
 
 @router.post("/swiggy/verify")
@@ -57,13 +39,12 @@ async def verify_swiggy(body: PlatformVerifyRequest):
 
 @router.post("/reelo/verify")
 async def verify_reelo(body: PlatformVerifyRequest):
-    if not body.api_key and not body.credential:
-        raise HTTPException(status_code=400, detail="API key is required")
-    return {
-        "valid": True,
-        "message": "Reelo API key saved. Manual verification required.",
-        "locations": [],
-    }
+    if body.credential:
+        return {"valid": True, "message": f"Reelo account connected via {body.credential}", "locations": []}
+    elif body.api_key:
+        return {"valid": True, "message": "Reelo API key saved.", "locations": []}
+    else:
+        raise HTTPException(status_code=400, detail="Phone number or credential is required")
 
 
 @router.post("/magicpin/verify")
