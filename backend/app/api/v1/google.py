@@ -38,8 +38,15 @@ def get_google_auth_url():
 @router.get("/callback")
 async def google_callback(code: str = "", error: str = ""):
     frontend_base = "https://revly-an-social-media-review-and-re.vercel.app"
+
     if error:
-        return RedirectResponse(url=f"{frontend_base}/overview?google_error={error}")
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=f"""<html><body><script>
+            window.opener.postMessage({{type:'google_error',error:'{error}'}}, '*');
+            window.close();
+            if(!window.opener) window.location.href='{frontend_base}/account/platform-integration';
+        </script></body></html>""")
+
     if not code:
         raise HTTPException(status_code=400, detail="No authorization code")
 
@@ -52,7 +59,11 @@ async def google_callback(code: str = "", error: str = ""):
             "grant_type": "authorization_code",
         })
         if token_resp.status_code != 200:
-            return RedirectResponse(url=f"{frontend_base}/overview?google_error=token_exchange_failed")
+            from fastapi.responses import HTMLResponse
+            return HTMLResponse(content=f"""<html><body><script>
+                window.opener.postMessage({{type:'google_error',error:'token_exchange_failed'}}, '*');
+                window.close();
+            </script></body></html>""")
         tokens = token_resp.json()
 
         user_resp = await client.get(GOOGLE_USERINFO_URL, headers={
@@ -68,10 +79,12 @@ async def google_callback(code: str = "", error: str = ""):
         "name": user_info.get("name", ""),
     })
 
-    from urllib.parse import quote
-    return RedirectResponse(
-        url=f"{frontend_base}/overview?google_connected={quote(redirect_data)}"
-    )
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=f"""<html><body><script>
+        window.opener.postMessage({{type:'google_connected',data:{redirect_data}}}, '*');
+        window.close();
+        if(!window.opener) window.location.href='{frontend_base}/account/platform-integration';
+    </script></body></html>""")
 
 
 @router.post("/fetch-locations")

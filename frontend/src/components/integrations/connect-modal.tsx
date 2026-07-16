@@ -45,26 +45,22 @@ export default function ConnectModal({ platform, onClose }: Props) {
   const config = platformConfig[platform] || { name: platform, color: "#6B7280", icon: "?", helpUrl: "", authType: "api_key" as const }
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const connected = params.get("google_connected")
-    const googleErr = params.get("google_error")
-
-    if (googleErr) {
-      setError("Google sign-in failed. Please try again.")
-      window.history.replaceState({}, "", "/overview")
-    }
-
-    if (connected) {
-      try {
-        const data = JSON.parse(decodeURIComponent(connected))
-        setGoogleEmail(data.email)
-        setStep("locations")
-        fetchLocations(data.access_token)
-      } catch {
-        setError("Failed to parse Google response")
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "google_connected") {
+        try {
+          const data = event.data.data
+          setGoogleEmail(data.email)
+          setStep("locations")
+          fetchLocations(data.access_token)
+        } catch {
+          setError("Failed to parse Google response")
+        }
+      } else if (event.data?.type === "google_error") {
+        setError("Google sign-in failed. Please try again.")
       }
-      window.history.replaceState({}, "", "/overview")
     }
+    window.addEventListener("message", handleMessage)
+    return () => window.removeEventListener("message", handleMessage)
   }, [])
 
   useEffect(() => {
@@ -91,7 +87,8 @@ export default function ConnectModal({ platform, onClose }: Props) {
     setError("")
     try {
       const { data } = await apiClient.get("/google/auth-url")
-      window.location.href = data.url
+      window.open(data.url, "google-oauth", "width=500,height=600,scrollbars=yes")
+      setLoading(false)
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: string } } }
       setError(axiosErr.response?.data?.detail || "Failed to start Google sign-in")
