@@ -113,7 +113,7 @@ async def fetch_google_locations(req: TokenRequest):
             for loc in loc_resp.json().get("locations", []):
                 addr = loc.get("storefrontAddress", {})
                 locations.append({
-                    "id": loc.get("name", "").split("/")[-1],
+                    "id": loc.get("name", ""),
                     "name": loc.get("title", "Unknown"),
                     "address": f"{addr.get('addressLines', [''])[0]}, {addr.get('locality', '')}",
                     "state": addr.get("administrativeArea", ""),
