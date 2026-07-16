@@ -86,24 +86,38 @@ async def fetch_google_locations(req: TokenRequest):
     if not access_token:
         raise HTTPException(status_code=400, detail="Missing access token")
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            "https://mybusinessbusinessinformation.googleapis.com/v1/locations",
-            headers={"Authorization": f"Bearer {access_token}"},
-            params={"readMask": "name,title,storefrontAddress,metadata"},
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        accounts_resp = await client.get(
+            "https://mybusinessbusinessinformation.googleapis.com/v1/accounts",
+            headers=headers,
         )
-        if resp.status_code != 200:
-            raise HTTPException(status_code=resp.status_code, detail=resp.text)
-        data = resp.json()
+        if accounts_resp.status_code != 200:
+            return {"locations": [], "error": f"Google API error: {accounts_resp.status_code} - {accounts_resp.text[:200]}"}
+
+        accounts = accounts_resp.json().get("accounts", [])
+        if not accounts:
+            return {"locations": [], "error": "No Google Business accounts found. Make sure you have a Google Business Profile at business.google.com"}
+
         locations = []
-        for loc in data.get("locations", []):
-            addr = loc.get("storefrontAddress", {})
-            locations.append({
-                "id": loc.get("name", "").split("/")[-1],
-                "name": loc.get("title", "Unknown"),
-                "address": f"{addr.get('addressLines', [''])[0]}, {addr.get('locality', '')}",
-                "state": addr.get("administrativeArea", ""),
-            })
+        for account in accounts:
+            account_id = account.get("name", "").split("/")[-1]
+            loc_resp = await client.get(
+                f"https://mybusinessbusinessinformation.googleapis.com/v1/accounts/{account_id}/locations",
+                headers=headers,
+                params={"readMask": "name,title,storefrontAddress,metadata"},
+            )
+            if loc_resp.status_code != 200:
+                continue
+            for loc in loc_resp.json().get("locations", []):
+                addr = loc.get("storefrontAddress", {})
+                locations.append({
+                    "id": loc.get("name", "").split("/")[-1],
+                    "name": loc.get("title", "Unknown"),
+                    "address": f"{addr.get('addressLines', [''])[0]}, {addr.get('locality', '')}",
+                    "state": addr.get("administrativeArea", ""),
+                })
         return {"locations": locations}
 
 

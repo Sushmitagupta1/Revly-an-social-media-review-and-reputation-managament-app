@@ -93,8 +93,9 @@ export default function ConnectModal({ platform, onClose }: Props) {
     try {
       const { data } = await apiClient.post("/google/fetch-locations", { access_token: token })
       setLocations(data.locations || [])
+      if (data.error) setError(data.error)
     } catch {
-      setError("Failed to fetch locations from Google")
+      setError("Failed to fetch locations from Google. Check console for details.")
     } finally {
       setLoading(false)
     }
