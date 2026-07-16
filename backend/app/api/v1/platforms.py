@@ -152,10 +152,22 @@ async def verify_api_key(platform: str, body: PlatformVerifyRequest):
 async def connect_locations(body: ConnectLocationsRequest):
     db = SessionLocal()
     try:
-        all_locations = MOCK_LOCATIONS.get(body.platform, [])
-        selected = [loc for loc in all_locations if loc["id"] in body.location_ids]
+        mock_locs = MOCK_LOCATIONS.get(body.platform, [])
 
-        for loc_data in selected:
+        locations_to_save = []
+        for loc_id in body.location_ids:
+            matched = next((l for l in mock_locs if l["id"] == loc_id), None)
+            if matched:
+                locations_to_save.append(matched)
+            else:
+                locations_to_save.append({
+                    "id": loc_id,
+                    "name": loc_id.split("/")[-1],
+                    "address": "",
+                    "state": "",
+                })
+
+        for loc_data in locations_to_save:
             existing_loc = db.query(Location).filter(
                 Location.brand_id == MOCK_BRAND_ID,
                 Location.name == loc_data["name"],
@@ -165,31 +177,34 @@ async def connect_locations(body: ConnectLocationsRequest):
                 loc = Location(
                     brand_id=MOCK_BRAND_ID,
                     name=loc_data["name"],
-                    address=loc_data["address"],
+                    address=loc_data.get("address", ""),
                     city="Ahmedabad",
-                    state=loc_data["state"],
+                    state=loc_data.get("state", ""),
                     country="India",
                 )
                 db.add(loc)
                 db.flush()
 
-            integration = db.query(Integration).filter(
-                Integration.brand_id == MOCK_BRAND_ID,
-                Integration.platform == body.platform,
-                Integration.account_name == body.account_name,
-            ).first()
+        integration = db.query(Integration).filter(
+            Integration.brand_id == MOCK_BRAND_ID,
+            Integration.platform == body.platform,
+        ).first()
 
-            if not integration:
-                integration = Integration(
-                    brand_id=MOCK_BRAND_ID,
-                    platform=body.platform,
-                    account_name=body.account_name,
-                    status="active",
-                    is_connected=True,
-                )
-                db.add(integration)
+        if not integration:
+            integration = Integration(
+                brand_id=MOCK_BRAND_ID,
+                platform=body.platform,
+                account_name=body.account_name,
+                status="active",
+                is_connected=True,
+            )
+            db.add(integration)
+        else:
+            integration.account_name = body.account_name
+            integration.is_connected = True
+            integration.status = "active"
 
         db.commit()
-        return {"success": True, "message": f"Connected {len(selected)} locations"}
+        return {"success": True, "message": f"Connected {len(locations_to_save)} locations"}
     finally:
         db.close()
