@@ -5,7 +5,12 @@ from urllib.parse import urlencode
 
 from app.core.config import settings
 
+from pydantic import BaseModel
+
 router = APIRouter()
+
+class TokenRequest(BaseModel):
+    access_token: str
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -76,7 +81,8 @@ async def google_callback(code: str = "", error: str = ""):
 
 
 @router.post("/fetch-locations")
-async def fetch_google_locations(access_token: str):
+async def fetch_google_locations(req: TokenRequest):
+    access_token = req.access_token
     if not access_token:
         raise HTTPException(status_code=400, detail="Missing access token")
 
@@ -101,8 +107,14 @@ async def fetch_google_locations(access_token: str):
         return {"locations": locations}
 
 
+class ReviewRequest(BaseModel):
+    access_token: str
+    location_id: str
+
 @router.post("/fetch-reviews")
-async def fetch_google_reviews(access_token: str, location_id: str):
+async def fetch_google_reviews(req: ReviewRequest):
+    access_token = req.access_token
+    location_id = req.location_id
     if not access_token or not location_id:
         raise HTTPException(status_code=400, detail="Missing parameters")
 
