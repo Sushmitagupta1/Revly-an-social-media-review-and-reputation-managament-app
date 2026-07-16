@@ -59,6 +59,28 @@ export default function ConnectModal({ platform, onClose }: Props) {
         setError("Google sign-in failed. Please try again.")
       }
     }
+
+    const params = new URLSearchParams(window.location.search)
+    const connected = params.get("google_connected")
+    const googleErr = params.get("google_error")
+
+    if (googleErr) {
+      setError("Google sign-in failed. Please try again.")
+      window.history.replaceState({}, "", window.location.pathname)
+    }
+
+    if (connected) {
+      try {
+        const data = JSON.parse(decodeURIComponent(connected))
+        setGoogleEmail(data.email)
+        setStep("locations")
+        fetchLocations(data.access_token)
+      } catch {
+        setError("Failed to parse Google response")
+      }
+      window.history.replaceState({}, "", window.location.pathname)
+    }
+
     window.addEventListener("message", handleMessage)
     return () => window.removeEventListener("message", handleMessage)
   }, [])
