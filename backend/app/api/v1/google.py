@@ -80,11 +80,32 @@ async def google_callback(code: str = "", error: str = ""):
     })
 
     from fastapi.responses import HTMLResponse
-    return HTMLResponse(content=f"""<html><body><script>
-        window.opener.postMessage({{type:'google_connected',data:{redirect_data}}}, '*');
-        window.close();
-        if(!window.opener) window.location.href='{frontend_base}/account/platform-integration';
-    </script></body></html>""")
+    return HTMLResponse(content=f"""<!DOCTYPE html>
+<html><head><title>Revly - Google Connected</title>
+<style>
+body{{font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#0F1835;color:white;text-align:center}}
+.box{{background:#162347;padding:40px 60px;border-radius:16px}}
+h2{{color:#20C997;margin-top:16px}}
+p{{color:#94A3B8;font-size:14px}}
+.btn{{margin-top:20px;padding:12px 24px;background:#FF6A2B;color:white;border:none;border-radius:10px;font-size:14px;cursor:pointer}}
+</style></head>
+<body><div class="box">
+<h2>&#10004; Google Account Connected!</h2>
+<p>You can close this window and return to Revly.</p>
+<button class="btn" onclick="sendAndClose()">Return to Revly</button>
+</div>
+<script>
+var d={redirect_data};
+function sendAndClose(){{
+  if(window.opener){{
+    window.opener.postMessage({{type:'google_connected',data:d}},'*');
+    window.close();
+  }}else{{
+    window.location.href='{frontend_base}/account/platform-integration?google_connected=1';
+  }}
+}}
+try{{ sendAndClose(); }}catch(e){{}}
+</script></body></html>""")
 
 
 @router.post("/fetch-locations")
