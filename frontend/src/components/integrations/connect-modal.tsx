@@ -61,7 +61,8 @@ export default function ConnectModal({ platform, onClose }: Props) {
     }
 
     const params = new URLSearchParams(window.location.search)
-    const connected = params.get("google_connected")
+    const accessToken = params.get("access_token")
+    const email = params.get("email")
     const googleErr = params.get("google_error")
 
     if (googleErr) {
@@ -69,15 +70,10 @@ export default function ConnectModal({ platform, onClose }: Props) {
       window.history.replaceState({}, "", window.location.pathname)
     }
 
-    if (connected) {
-      try {
-        const data = JSON.parse(decodeURIComponent(connected))
-        setGoogleEmail(data.email)
-        setStep("locations")
-        fetchLocations(data.access_token)
-      } catch {
-        setError("Failed to parse Google response")
-      }
+    if (accessToken && email) {
+      setGoogleEmail(email)
+      setStep("locations")
+      fetchLocations(accessToken)
       window.history.replaceState({}, "", window.location.pathname)
     }
 
@@ -108,9 +104,9 @@ export default function ConnectModal({ platform, onClose }: Props) {
     setLoading(true)
     setError("")
     try {
+      localStorage.setItem("revly_google_connect", platform)
       const { data } = await apiClient.get("/google/auth-url")
-      window.open(data.url, "google-oauth", "width=500,height=600,scrollbars=yes")
-      setLoading(false)
+      window.location.href = data.url
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: string } } }
       setError(axiosErr.response?.data?.detail || "Failed to start Google sign-in")

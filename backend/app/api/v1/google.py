@@ -16,6 +16,8 @@ GOOGLE_BUSINESS_PROFILE_SCOPES = [
     "https://www.googleapis.com/auth/userinfo.profile",
 ]
 
+FRONTEND_BASE = "https://revly-an-social-media-review-and-re.vercel.app"
+
 
 @router.get("/auth-url")
 def get_google_auth_url():
@@ -37,15 +39,10 @@ def get_google_auth_url():
 
 @router.get("/callback")
 async def google_callback(code: str = "", error: str = ""):
-    frontend_base = "https://revly-an-social-media-review-and-re.vercel.app"
-
     if error:
-        from fastapi.responses import HTMLResponse
-        return HTMLResponse(content=f"""<html><body><script>
-            window.opener.postMessage({{type:'google_error',error:'{error}'}}, '*');
-            window.close();
-            if(!window.opener) window.location.href='{frontend_base}/account/platform-integration';
-        </script></body></html>""")
+        return RedirectResponse(
+            url=f"{FRONTEND_BASE}/account/platform-integration?google_error={error}"
+        )
 
     if not code:
         raise HTTPException(status_code=400, detail="No authorization code")
@@ -59,11 +56,9 @@ async def google_callback(code: str = "", error: str = ""):
             "grant_type": "authorization_code",
         })
         if token_resp.status_code != 200:
-            from fastapi.responses import HTMLResponse
-            return HTMLResponse(content=f"""<html><body><script>
-                window.opener.postMessage({{type:'google_error',error:'token_exchange_failed'}}, '*');
-                window.close();
-            </script></body></html>""")
+            return RedirectResponse(
+                url=f"{FRONTEND_BASE}/account/platform-integration?google_error=token_exchange_failed"
+            )
         tokens = token_resp.json()
 
         user_resp = await client.get(GOOGLE_USERINFO_URL, headers={
@@ -71,41 +66,13 @@ async def google_callback(code: str = "", error: str = ""):
         })
         user_info = user_resp.json() if user_resp.status_code == 200 else {}
 
-    import json
-    redirect_data = json.dumps({
-        "access_token": tokens.get("access_token"),
-        "refresh_token": tokens.get("refresh_token"),
+    params = urlencode({
+        "access_token": tokens.get("access_token", ""),
+        "refresh_token": tokens.get("refresh_token", ""),
         "email": user_info.get("email", ""),
         "name": user_info.get("name", ""),
     })
-
-    from fastapi.responses import HTMLResponse
-    return HTMLResponse(content=f"""<!DOCTYPE html>
-<html><head><title>Revly - Google Connected</title>
-<style>
-body{{font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#0F1835;color:white;text-align:center}}
-.box{{background:#162347;padding:40px 60px;border-radius:16px}}
-h2{{color:#20C997;margin-top:16px}}
-p{{color:#94A3B8;font-size:14px}}
-.btn{{margin-top:20px;padding:12px 24px;background:#FF6A2B;color:white;border:none;border-radius:10px;font-size:14px;cursor:pointer}}
-</style></head>
-<body><div class="box">
-<h2>&#10004; Google Account Connected!</h2>
-<p>You can close this window and return to Revly.</p>
-<button class="btn" onclick="sendAndClose()">Return to Revly</button>
-</div>
-<script>
-var d={redirect_data};
-function sendAndClose(){{
-  if(window.opener){{
-    window.opener.postMessage({{type:'google_connected',data:d}},'*');
-    window.close();
-  }}else{{
-    window.location.href='{frontend_base}/account/platform-integration?google_connected=1';
-  }}
-}}
-try{{ sendAndClose(); }}catch(e){{}}
-</script></body></html>""")
+    return RedirectResponse(url=f"{FRONTEND_BASE}/account/platform-integration?{params}")
 
 
 @router.post("/fetch-locations")

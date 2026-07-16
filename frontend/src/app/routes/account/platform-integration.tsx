@@ -25,6 +25,20 @@ export default function PlatformIntegrationPage() {
 
   useEffect(() => { fetchIntegrations() }, [])
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const accessToken = params.get("access_token")
+    const email = params.get("email")
+    if (accessToken && email) {
+      setConnectPlatform("google")
+    }
+    const savedPlatform = localStorage.getItem("revly_google_connect")
+    if (savedPlatform && !accessToken) {
+      setConnectPlatform(savedPlatform)
+      localStorage.removeItem("revly_google_connect")
+    }
+  }, [])
+
   const connectedPlatforms = integrations.filter((i) => i.is_connected)
   const connectedCount = connectedPlatforms.length
 
