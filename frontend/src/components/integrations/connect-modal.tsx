@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { X, ArrowLeft, CheckCircle, MapPin, Loader2, Key, ExternalLink, Mail, Phone, Shield } from "lucide-react"
+import { X, ArrowLeft, CheckCircle, MapPin, Loader2, Key, ExternalLink, Phone, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useIntegrationStore } from "@/stores/integration-store"
 import apiClient from "@/lib/api-client"
