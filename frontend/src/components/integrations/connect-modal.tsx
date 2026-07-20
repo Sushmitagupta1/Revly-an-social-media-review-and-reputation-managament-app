@@ -51,7 +51,7 @@ export default function ConnectModal({ platform, onClose }: Props) {
           const data = event.data.data
           setGoogleEmail(data.email)
           setStep("locations")
-          fetchLocations(data.access_token)
+          setGoogleToken(data.access_token)
         } catch {
           setError("Failed to parse Google response")
         }
@@ -73,7 +73,7 @@ export default function ConnectModal({ platform, onClose }: Props) {
     if (accessToken && email) {
       setGoogleEmail(email)
       setStep("locations")
-      fetchLocations(accessToken)
+      setGoogleToken(accessToken)
       window.history.replaceState({}, "", window.location.pathname)
     }
 
@@ -419,20 +419,22 @@ export default function ConnectModal({ platform, onClose }: Props) {
             <p className="text-[13px] text-white/50">
               {googleEmail ? `Signed in as ${googleEmail}` : `Select locations from your ${config.name} account`}
             </p>
-            {error && (
-              <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400">{error}</div>
-            )}
             {locations.length === 0 ? (
               <div className="flex flex-col items-center gap-3 py-8">
                 <MapPin className="h-8 w-8 text-white/20" />
-                <p className="text-[13px] text-white/50">No locations found for this account</p>
+                <p className="text-[13px] text-white/50">
+                  {error ? "Failed to load locations" : "Click below to fetch your Google Business locations"}
+                </p>
+                {error && (
+                  <div className="rounded-[14px] bg-red-500/10 p-3 text-[13px] text-red-400 text-center max-w-sm">{error}</div>
+                )}
                 {googleToken && (
                   <button
                     onClick={() => { setError(""); fetchLocations(googleToken) }}
                     disabled={loading}
-                    className="mt-2 rounded-[14px] bg-accent px-6 py-2.5 text-[13px] font-semibold text-white transition-all hover:scale-[1.02] disabled:opacity-50"
+                    className="mt-2 rounded-[14px] bg-accent px-6 py-2.5 text-[13px] font-semibold text-white shadow-[0_0_25px_rgba(255,106,43,0.3)] transition-all hover:scale-[1.02] disabled:opacity-50"
                   >
-                    {loading ? "Retrying..." : "Retry Fetching Locations"}
+                    {loading ? "Fetching Locations..." : "Fetch Locations"}
                   </button>
                 )}
               </div>
