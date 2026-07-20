@@ -88,14 +88,17 @@ export default function ConnectModal({ platform, onClose }: Props) {
     }
   }, [step, resendTimer])
 
+  const [googleToken, setGoogleToken] = useState("")
+
   const fetchLocations = async (token: string) => {
     setLoading(true)
+    setGoogleToken(token)
     try {
       const { data } = await apiClient.post("/google/fetch-locations", { access_token: token })
       setLocations(data.locations || [])
       if (data.error) setError(data.error)
     } catch {
-      setError("Failed to fetch locations from Google. Check console for details.")
+      setError("Failed to fetch locations from Google.")
     } finally {
       setLoading(false)
     }
@@ -423,6 +426,15 @@ export default function ConnectModal({ platform, onClose }: Props) {
               <div className="flex flex-col items-center gap-3 py-8">
                 <MapPin className="h-8 w-8 text-white/20" />
                 <p className="text-[13px] text-white/50">No locations found for this account</p>
+                {googleToken && (
+                  <button
+                    onClick={() => { setError(""); fetchLocations(googleToken) }}
+                    disabled={loading}
+                    className="mt-2 rounded-[14px] bg-accent px-6 py-2.5 text-[13px] font-semibold text-white transition-all hover:scale-[1.02] disabled:opacity-50"
+                  >
+                    {loading ? "Retrying..." : "Retry Fetching Locations"}
+                  </button>
+                )}
               </div>
             ) : (
               <>
