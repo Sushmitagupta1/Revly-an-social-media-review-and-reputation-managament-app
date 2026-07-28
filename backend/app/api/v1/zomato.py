@@ -170,6 +170,40 @@ class BulkImportRequest(BaseModel):
     reviews: list[BulkReviewItem]
 
 
+@router.post("/init-integration")
+async def init_zomato_integration():
+    from app.models.integration import Integration
+    from datetime import datetime, timezone
+
+    db = SessionLocal()
+    try:
+        existing = db.query(Integration).filter(
+            Integration.brand_id == MOCK_BRAND_ID,
+            Integration.platform == "zomato",
+        ).first()
+        if existing:
+            existing.is_connected = True
+            existing.status = "active"
+            existing.last_synced = datetime.now(timezone.utc).isoformat()
+            db.commit()
+            return {"success": True, "message": "Updated existing integration", "id": str(existing.id)}
+
+        integration = Integration(
+            brand_id=MOCK_BRAND_ID,
+            platform="zomato",
+            account_name="Zomato Partner",
+            status="active",
+            is_connected=True,
+            last_synced=datetime.now(timezone.utc).isoformat(),
+        )
+        db.add(integration)
+        db.commit()
+        db.refresh(integration)
+        return {"success": True, "message": "Created integration", "id": str(integration.id)}
+    finally:
+        db.close()
+
+
 @router.post("/bulk-import")
 async def bulk_import_reviews(body: BulkImportRequest):
     db = SessionLocal()
