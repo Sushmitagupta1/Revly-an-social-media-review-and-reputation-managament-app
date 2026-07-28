@@ -322,8 +322,8 @@ async def init_zomato_integration():
 async def fix_review_dates():
     """One-time endpoint to fix existing review dates from stored zomato_reviews.json data."""
     import os
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    json_path = os.path.join(project_root, "zomato_reviews.json")
+    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    json_path = os.path.join(backend_dir, "zomato_reviews.json")
     if not os.path.exists(json_path):
         return {"error": "zomato_reviews.json not found", "path": json_path}
 
