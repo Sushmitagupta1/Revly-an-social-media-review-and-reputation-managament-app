@@ -15,3 +15,8 @@ class Integration(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(20), default="active")
     last_synced: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_connected: Mapped[bool] = mapped_column(Boolean, default=False)
+    auth_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    csrf_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mx_csrf_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cookies: Mapped[str | None] = mapped_column(Text, nullable=True)
+    restaurant_ids: Mapped[str | None] = mapped_column(Text, nullable=True)

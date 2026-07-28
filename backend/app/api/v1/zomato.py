@@ -1,3 +1,4 @@
+import json
 import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -60,10 +61,47 @@ async def connect_zomato(body: ZomatoAuthRequest):
             )
         data = resp.json()
 
+    from app.models.integration import Integration
+    from datetime import datetime, timezone
+
+    db = SessionLocal()
+    try:
+        integration = db.query(Integration).filter(
+            Integration.brand_id == MOCK_BRAND_ID,
+            Integration.platform == "zomato",
+        ).first()
+        if integration:
+            integration.auth_token = body.auth_token
+            integration.csrf_token = body.csrf_token
+            integration.mx_csrf_token = body.mx_csrf_token
+            integration.cookies = body.cookies
+            integration.restaurant_ids = json.dumps(body.restaurant_ids)
+            integration.is_connected = True
+            integration.status = "active"
+            integration.last_synced = datetime.now(timezone.utc).isoformat()
+        else:
+            integration = Integration(
+                brand_id=MOCK_BRAND_ID,
+                platform="zomato",
+                account_name="Zomato Partner",
+                status="active",
+                is_connected=True,
+                auth_token=body.auth_token,
+                csrf_token=body.csrf_token,
+                mx_csrf_token=body.mx_csrf_token,
+                cookies=body.cookies,
+                restaurant_ids=json.dumps(body.restaurant_ids),
+                last_synced=datetime.now(timezone.utc).isoformat(),
+            )
+            db.add(integration)
+        db.commit()
+    finally:
+        db.close()
+
     review_count = len(data.get("reviews", []))
     return {
         "valid": True,
-        "message": f"Zomato connected. Found {review_count} reviews for restaurant {test_id}.",
+        "message": f"Zomato connected. Found {review_count} reviews for restaurant {test_id}. Auto-sync enabled (every 15 min).",
         "review_count": review_count,
     }
 
@@ -249,6 +287,13 @@ async def init_zomato_integration():
         return {"success": True, "message": "Created integration", "id": str(integration.id)}
     finally:
         db.close()
+
+
+@router.post("/sync")
+async def manual_sync():
+    from app.services.zomato_sync import sync_zomato_reviews
+    sync_zomato_reviews()
+    return {"success": True, "message": "Sync completed"}
 
 
 @router.post("/bulk-import")

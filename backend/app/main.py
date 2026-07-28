@@ -1,6 +1,8 @@
 import os
+import logging
 from pathlib import Path
 
+from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -10,7 +12,12 @@ from app.core.config import settings
 from app.core.database import engine
 from app.models import Base
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("zomato_sync")
+
 app = FastAPI(title="Revly API", version="0.1.0")
+
+scheduler = BackgroundScheduler()
 
 
 @app.on_event("startup")
@@ -18,6 +25,18 @@ def on_startup():
     Base.metadata.create_all(bind=engine)
     from app.seed_admin import seed_admin
     seed_admin()
+
+    from app.services.zomato_sync import sync_zomato_reviews
+    scheduler.add_job(sync_zomato_reviews, "interval", minutes=15, id="zomato_sync")
+    scheduler.start()
+    logger.info("Zomato auto-sync scheduler started (every 15 minutes)")
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    scheduler.shutdown(wait=False)
+    logger.info("Scheduler stopped")
+
 
 app.add_middleware(
     CORSMiddleware,
