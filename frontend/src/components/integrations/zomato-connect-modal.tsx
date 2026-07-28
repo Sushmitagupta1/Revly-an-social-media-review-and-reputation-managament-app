@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { X, Loader2, CheckCircle, AlertCircle, ExternalLink, Copy } from "lucide-react"
 import apiClient from "@/lib/api-client"
+import { useIntegrationStore } from "@/stores/integration-store"
 
 interface Props {
   onClose: () => void
@@ -16,6 +17,7 @@ export default function ZomatoConnectModal({ onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [result, setResult] = useState<{ message?: string; review_count?: number } | null>(null)
+  const { createIntegration } = useIntegrationStore()
 
   const handleConnect = async () => {
     if (!authToken.trim()) return
@@ -32,6 +34,7 @@ export default function ZomatoConnectModal({ onClose }: Props) {
         restaurant_ids: ids,
       })
       setResult(data)
+      await createIntegration({ platform: "zomato", account_name: "Zomato Partner" })
       setStep("success")
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: string } } }
