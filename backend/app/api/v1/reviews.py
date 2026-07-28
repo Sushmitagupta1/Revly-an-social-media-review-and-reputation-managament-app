@@ -1,6 +1,7 @@
 import io
 import math
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -44,6 +45,8 @@ def list_reviews(
     platform: str | None = None,
     rating: int | None = None,
     sentiment: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
 ):
@@ -57,6 +60,18 @@ def list_reviews(
         query = query.filter(Review.rating == rating)
     if sentiment:
         query = query.filter(Review.sentiment == sentiment)
+    if date_from:
+        try:
+            dt = datetime.fromisoformat(date_from)
+            query = query.filter(Review.created_at >= dt)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            dt = datetime.fromisoformat(date_to)
+            query = query.filter(Review.created_at <= dt)
+        except ValueError:
+            pass
 
     total = query.count()
     pages = math.ceil(total / limit) if total > 0 else 1

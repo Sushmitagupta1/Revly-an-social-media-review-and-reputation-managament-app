@@ -25,13 +25,11 @@ from app.schemas.dashboard import (
 
 router = APIRouter()
 
-MOCK_LOCATIONS = {
-    "loc_1": "Upper Crust Vastrapur",
-    "loc_2": "Upper Crust SG Highway",
-    "loc_3": "Upper Crust Drive-In",
-    "loc_4": "Upper Crust Bodakdev",
-    "loc_5": "Upper Crust Thaltej",
-}
+
+def _build_location_resolver(db: Session) -> dict[str, str]:
+    from app.models.location import Location
+    rows = db.query(Location.id, Location.name).all()
+    return {str(r.id): r.name for r in rows}
 
 
 def _resolve_location_ids(db: Session, location_names: list[str]) -> list[str]:
@@ -47,6 +45,7 @@ def get_dashboard(
     locations: Optional[str] = Query(None, description="Comma-separated location names to filter by"),
 ):
     now = datetime.now(timezone.utc)
+    loc_resolver = _build_location_resolver(db)
 
     base_query = db.query(Review)
     if locations:
@@ -146,7 +145,7 @@ def get_dashboard(
         loc_id_str = str(loc_id) if loc_id else "unknown"
         locations.append(LocationSummary(
             location_id=loc_id_str,
-            location_name=MOCK_LOCATIONS.get(loc_id_str, f"Location {loc_id_str[:8]}"),
+            location_name=loc_resolver.get(loc_id_str, f"Location {loc_id_str[:8]}"),
             review_count=count,
             average_rating=round(float(avg), 1),
         ))
@@ -162,7 +161,7 @@ def get_dashboard(
     complaints_by_location = [
         ComplaintLocation(
             location_id=str(loc_id) if loc_id else "unknown",
-            location_name=MOCK_LOCATIONS.get(str(loc_id) if loc_id else "unknown", f"Location {str(loc_id)[:8]}"),
+            location_name=loc_resolver.get(str(loc_id) if loc_id else "unknown", f"Location {str(loc_id)[:8]}"),
             count=count,
         )
         for loc_id, count in complaints_location_rows
@@ -177,7 +176,7 @@ def get_dashboard(
     praises_by_location = [
         PraiseLocation(
             location_id=str(loc_id) if loc_id else "unknown",
-            location_name=MOCK_LOCATIONS.get(str(loc_id) if loc_id else "unknown", f"Location {str(loc_id)[:8]}"),
+            location_name=loc_resolver.get(str(loc_id) if loc_id else "unknown", f"Location {str(loc_id)[:8]}"),
             count=count,
         )
         for loc_id, count in praises_location_rows

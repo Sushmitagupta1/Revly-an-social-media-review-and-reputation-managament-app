@@ -1,0 +1,119 @@
+[
+  {
+    "res_id": "110076",
+    "name": "Upper Crust",
+    "subzone": "Navrangpura",
+    "city": "Ahmedabad",
+    "address": "Aarohi Complex, Vijay Cross Road, Navrangpura, Ahmedabad",
+    "rating": "4.5",
+    "votes": 8324
+  },
+  {
+    "res_id": "110412",
+    "name": "Upper Crust",
+    "subzone": "Prahlad Nagar",
+    "city": "Ahmedabad",
+    "address": "Rivera Arcade, Near Auda Garden, Prahlad Nagar, Ahmedabad",
+    "rating": "4.4",
+    "votes": 5158
+  },
+  {
+    "res_id": "110562",
+    "name": "Upper Crust",
+    "subzone": "Vastrapur",
+    "city": "Ahmedabad",
+    "address": "4 & 5, Shubham Complex, Sunrise Park Corner, Near Vastrapur Lake, Vastrapur, Ahmedabad",
+    "rating": "4.4",
+    "votes": 8365
+  },
+  {
+    "res_id": "113154",
+    "name": "Upper Crust",
+    "subzone": "Bopal",
+    "city": "Ahmedabad",
+    "address": "Shop 15, Orchid Centre, Opposite Safal Parishar, Bopal, Ahmedabad",
+    "rating": "3.9",
+    "votes": 4549
+  },
+  {
+    "res_id": "19931452",
+    "name": "Lithosphere By Upper Crust",
+    "subzone": "Bodakdev",
+    "city": "Ahmedabad",
+    "address": "G Highway, Near 9th Aveneue, Bodakdev, Ahmedabad",
+    "rating": "4.5",
+    "votes": 2498
+  },
+  {
+    "res_id": "20512260",
+    "name": "Upper Crust Bakery",
+    "subzone": "Prahlad Nagar",
+    "city": "Ahmedabad",
+    "address": "15, Shivam Priory, Prahlad Nagar, Ahmedabad",
+    "rating": "4.4",
+    "votes": 961
+  },
+  {
+    "res_id": "20512310",
+    "name": "Upper Crust Bakery",
+    "subzone": "Kankaria",
+    "city": "Ahmedabad",
+    "address": "3/B, Bhartiyanagar Society, Kakariya Road, Near Navan Park, Kankaria, Ahmedabad",
+    "rating": "4.4",
+    "votes": 370
+  },
+  {
+    "res_id": "20512997",
+    "name": "Upper Crust Bakery",
+    "subzone": "C G Road",
+    "city": "Ahmedabad",
+    "address": "12, Chandan Complex, C G Road, Ahmedabad",
+    "rating": "4.4",
+    "votes": 1021
+  },
+  {
+    "res_id": "20590610",
+    "name": "Altitude The Rooftop By Upper Crust",
+    "subzone": "Bodakdev",
+    "city": "Ahmedabad",
+    "address": "Lithosphare, Rajpath Club, SG Highway, Rajpath Rangoli Road, Near 9th Avenue, Bodakdev, Ahmedabad",
+    "rating": "4.2",
+    "votes": 81
+  },
+  {
+    "res_id": "21137468",
+    "name": "Upper Crust Bakery",
+    "subzone": "Prahlad Nagar",
+    "city": "Ahmedabad",
+    "address": "16, Ground Floor, Rivera Arcade, Prahlad Nagar, Ahmedabad",
+    "rating": "4.3",
+    "votes": 41
+  },
+  {
+    "res_id": "21137716",
+    "name": "Upper Crust Bakery",
+    "subzone": "Bopal",
+    "city": "Ahmedabad",
+    "address": "15/A, Ground Floor, Orchid Center, Opposite Safal Parisar, Bopal, Ahmedabad",
+    "rating": "4.3",
+    "votes": 0
+  },
+  {
+    "res_id": "21137764",
+    "name": "Upper Crust Bakery",
+    "subzone": "Navrangpura",
+    "city": "Ahmedabad",
+    "address": "106, 1st Floor, Aarohi Complex, Near Nilima Park, Navrangpura, Ahmedabad",
+    "rating": "4.0",
+    "votes": 31
+  },
+  {
+    "res_id": "21554718",
+    "name": "Upper Crust",
+    "subzone": "Bodakdev",
+    "city": "Ahmedabad",
+    "address": "8/122, 8/122/1, 8/122/2, 8/122/3, 8/122/4, 8/122/5 8/122/68/122/7, 8/122/8, Tilage, Thol, Aluka Kadi, Mahesana, Bodakdev, Ahmedabad",
+    "rating": "4.3",
+    "votes": 0
+  }
+]

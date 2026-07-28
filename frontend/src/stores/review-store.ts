@@ -14,6 +14,8 @@ interface ReviewState {
     platform: string | null
     rating: number | null
     sentiment: string | null
+    date_from: string | null
+    date_to: string | null
   }
   setFilters: (filters: Partial<ReviewState["filters"]>) => void
   setPage: (page: number) => void
@@ -33,7 +35,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   pages: 1,
   stats: null,
   isLoading: false,
-  filters: { search: "", platform: null, rating: null, sentiment: null },
+  filters: { search: "", platform: null, rating: null, sentiment: null, date_from: null, date_to: null },
 
   setFilters: (filters) => {
     set((s) => ({ filters: { ...s.filters, ...filters }, page: 1 }))
@@ -53,6 +55,8 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     if (filters.platform) params.set("platform", filters.platform)
     if (filters.rating) params.set("rating", String(filters.rating))
     if (filters.sentiment) params.set("sentiment", filters.sentiment)
+    if (filters.date_from) params.set("date_from", filters.date_from)
+    if (filters.date_to) params.set("date_to", filters.date_to)
     params.set("page", String(page))
     params.set("limit", "20")
 
