@@ -3,6 +3,7 @@ import { X, ArrowLeft, CheckCircle, MapPin, Loader2, Key, ExternalLink, Phone, S
 import { cn } from "@/lib/utils"
 import { useIntegrationStore } from "@/stores/integration-store"
 import apiClient from "@/lib/api-client"
+import ZomatoConnectModal from "./zomato-connect-modal"
 
 interface Props {
   platform: string
@@ -28,6 +29,10 @@ interface Location {
 }
 
 export default function ConnectModal({ platform, onClose }: Props) {
+  if (platform === "zomato") {
+    return <ZomatoConnectModal onClose={onClose} />
+  }
+
   const [step, setStep] = useState<Step>("auth")
   const [loading, setLoading] = useState(false)
   const [googleEmail, setGoogleEmail] = useState("")
