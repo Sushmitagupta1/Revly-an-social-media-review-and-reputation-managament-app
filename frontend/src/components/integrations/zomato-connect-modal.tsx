@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { X, Loader2, CheckCircle, AlertCircle, ExternalLink, Copy } from "lucide-react"
+import { X, Loader2, CheckCircle, AlertCircle, ExternalLink } from "lucide-react"
 import apiClient from "@/lib/api-client"
 import { useIntegrationStore } from "@/stores/integration-store"
 
