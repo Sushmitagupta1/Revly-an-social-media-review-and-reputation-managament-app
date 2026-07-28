@@ -164,10 +164,57 @@ class BulkReviewItem(BaseModel):
     rating: int
     text: str = ""
     res_id: str = ""
+    location_id: str = ""
 
 
 class BulkImportRequest(BaseModel):
     reviews: list[BulkReviewItem]
+
+
+class LocationItem(BaseModel):
+    res_id: str
+    name: str
+    subzone: str = ""
+    city: str = ""
+    address: str = ""
+
+
+class SetupLocationsRequest(BaseModel):
+    locations: list[LocationItem]
+
+
+@router.post("/setup-locations")
+async def setup_locations(body: SetupLocationsRequest):
+    from app.models.location import Location
+
+    db = SessionLocal()
+    created = 0
+    res_to_loc = {}
+    try:
+        for loc in body.locations:
+            existing = db.query(Location).filter(
+                Location.brand_id == MOCK_BRAND_ID,
+                Location.name == loc.name,
+            ).first()
+            if existing:
+                res_to_loc[loc.res_id] = str(existing.id)
+                continue
+
+            location = Location(
+                brand_id=MOCK_BRAND_ID,
+                name=loc.name,
+                address=loc.address or f"{loc.subzone}, {loc.city}",
+                city=loc.city or "Ahmedabad",
+            )
+            db.add(location)
+            db.flush()
+            res_to_loc[loc.res_id] = str(location.id)
+            created += 1
+        db.commit()
+    finally:
+        db.close()
+
+    return {"success": True, "created": created, "mapping": res_to_loc}
 
 
 @router.post("/init-integration")
@@ -206,9 +253,12 @@ async def init_zomato_integration():
 
 @router.post("/bulk-import")
 async def bulk_import_reviews(body: BulkImportRequest):
+    import uuid as uuid_mod
+
     db = SessionLocal()
     saved_count = 0
     skipped = 0
+    updated_loc = 0
     try:
         for rev in body.reviews:
             existing = db.query(Review).filter(
@@ -216,6 +266,9 @@ async def bulk_import_reviews(body: BulkImportRequest):
                 Review.platform_review_id == rev.platform_review_id,
             ).first()
             if existing:
+                if rev.location_id and not existing.location_id:
+                    existing.location_id = uuid_mod.UUID(rev.location_id)
+                    updated_loc += 1
                 skipped += 1
                 continue
 
@@ -229,6 +282,8 @@ async def bulk_import_reviews(body: BulkImportRequest):
                 sentiment=_classify_sentiment(rev.rating, rev.text),
                 topics=_extract_topics(rev.text),
             )
+            if rev.location_id:
+                review.location_id = uuid_mod.UUID(rev.location_id)
             db.add(review)
             saved_count += 1
         db.commit()
@@ -239,6 +294,7 @@ async def bulk_import_reviews(body: BulkImportRequest):
         "success": True,
         "saved": saved_count,
         "skipped": skipped,
+        "updated_location": updated_loc,
     }
 
 
