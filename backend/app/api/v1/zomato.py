@@ -318,6 +318,42 @@ async def init_zomato_integration():
         db.close()
 
 
+@router.post("/fix-dates")
+async def fix_review_dates():
+    """One-time endpoint to fix existing review dates from stored zomato_reviews.json data."""
+    import os
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    json_path = os.path.join(project_root, "zomato_reviews.json")
+    if not os.path.exists(json_path):
+        return {"error": "zomato_reviews.json not found", "path": json_path}
+
+    with open(json_path) as f:
+        reviews_data = json.load(f)
+
+    date_map = {}
+    for r in reviews_data:
+        pid = r.get("platform_review_id", "")
+        dd = r.get("display_date", "")
+        if pid and dd:
+            date_map[pid] = dd
+
+    db = SessionLocal()
+    updated = 0
+    try:
+        zomato_reviews = db.query(Review).filter(Review.platform == "zomato").all()
+        for rev in zomato_reviews:
+            if rev.platform_review_id in date_map:
+                dt = _parse_display_date(date_map[rev.platform_review_id])
+                if dt:
+                    rev.created_at = dt
+                    updated += 1
+        db.commit()
+    finally:
+        db.close()
+
+    return {"success": True, "updated": updated, "total_dates": len(date_map)}
+
+
 @router.post("/sync")
 async def manual_sync():
     from app.services.zomato_sync import sync_zomato_reviews
