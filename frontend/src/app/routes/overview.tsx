@@ -14,6 +14,7 @@ import type { DashboardData } from "@/types/dashboard"
 export default function OverviewPage() {
   const user = useAuthStore((s) => s.user)
   const selectedLocations = useFilterStore((s) => s.selectedLocations)
+  const dateRange = useFilterStore((s) => s.dateRange)
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -25,6 +26,12 @@ export default function OverviewPage() {
         if (selectedLocations.length > 0) {
           params.locations = selectedLocations.join(",")
         }
+        if (dateRange.from) {
+          params.date_from = dateRange.from
+        }
+        if (dateRange.to) {
+          params.date_to = dateRange.to
+        }
         const res = await apiClient.get("/dashboard", { params })
         if (!cancelled) setData(res.data)
       } catch (err: any) {
@@ -33,7 +40,7 @@ export default function OverviewPage() {
     }
     load()
     return () => { cancelled = true }
-  }, [selectedLocations])
+  }, [selectedLocations, dateRange])
 
   if (error) {
     return (

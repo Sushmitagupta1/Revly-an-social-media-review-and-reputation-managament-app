@@ -52,7 +52,7 @@ export default function LocationLeaderboardPage() {
                   <Trophy className="h-4 w-4 text-accent" />
                   <span className="text-[11px] font-semibold text-accent uppercase tracking-wider">Top Performer</span>
                 </div>
-                <p className="text-[18px] font-bold text-text">{topPerformer.location_id}</p>
+                <p className="text-[18px] font-bold text-text">{topPerformer.location_name}</p>
                 <p className="mt-0.5 text-[12px] text-text-secondary">Leading on reviews this week</p>
               </div>
               <div className="text-right">
@@ -69,7 +69,7 @@ export default function LocationLeaderboardPage() {
                   <TrendingUp className="h-4 w-4 text-accent" />
                   <span className="text-[11px] font-semibold text-accent uppercase tracking-wider">Most Improved</span>
                 </div>
-                <p className="text-[18px] font-bold text-text">{mostImproved.location_id}</p>
+                <p className="text-[18px] font-bold text-text">{mostImproved.location_name}</p>
                 <p className="mt-0.5 text-[12px] text-text-secondary">Biggest positive change</p>
               </div>
               <div className="text-right">
@@ -118,7 +118,7 @@ export default function LocationLeaderboardPage() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-[14px] font-semibold text-text truncate">{loc.location_id}</p>
+                    <p className="text-[14px] font-semibold text-text truncate">{loc.location_name}</p>
                     <div className="flex items-center gap-2">
                       <span className={cn("rounded-xl px-2.5 py-0.5 text-[11px] font-semibold", getRatingBg(loc.avg_rating))}>
                         {loc.avg_rating.toFixed(1)}

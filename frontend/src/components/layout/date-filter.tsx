@@ -1,39 +1,58 @@
 import { useState } from "react"
 import { useFilterStore } from "@/stores/filter-store"
 import { cn } from "@/lib/utils"
-import { Calendar, X } from "lucide-react"
-
-const rangeOptions = [
-  { label: "Daily", desc: "Day by day" },
-  { label: "Weekly", desc: "Week by week" },
-  { label: "Monthly", desc: "Month by month" },
-  { label: "Quarterly", desc: "Quarter by quarter" },
-]
+import { Calendar } from "lucide-react"
 
 const durationOptions = [
-  { label: "Today", desc: "Current day" },
-  { label: "Yesterday", desc: "Previous day" },
-  { label: "Past 7 Days", desc: "Last week" },
-  { label: "Past 30 Days", desc: "Last month" },
-  { label: "Custom", desc: "Pick dates" },
+  { label: "Today", getRange: () => {
+    const now = new Date()
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    return { from: start.toISOString().split("T")[0], to: now.toISOString().split("T")[0] }
+  }},
+  { label: "Yesterday", getRange: () => {
+    const now = new Date()
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    return { from: start.toISOString().split("T")[0], to: end.toISOString().split("T")[0] }
+  }},
+  { label: "Past 7 Days", getRange: () => {
+    const now = new Date()
+    const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    return { from: start.toISOString().split("T")[0], to: now.toISOString().split("T")[0] }
+  }},
+  { label: "Past 30 Days", getRange: () => {
+    const now = new Date()
+    const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    return { from: start.toISOString().split("T")[0], to: now.toISOString().split("T")[0] }
+  }},
+  { label: "All Time", getRange: () => ({ from: "", to: "" }) },
 ]
 
 export default function DateFilter() {
   const { datePreset, setDatePreset, dateRange, setDateRange } = useFilterStore()
   const [open, setOpen] = useState(false)
+  const [tempPreset, setTempPreset] = useState(datePreset)
   const [customFrom, setCustomFrom] = useState(dateRange.from || "")
   const [customTo, setCustomTo] = useState(dateRange.to || "")
 
-  const isCustom = durationOptions.findIndex((d) => d.label === datePreset) === 4
-
-  function handleDurationSelect(option: string) {
-    setDatePreset(option)
-  }
+  const isCustom = tempPreset === "Custom"
 
   function handleApply() {
-    setDateRange(customFrom || null, customTo || null)
+    if (isCustom) {
+      setDatePreset("Custom")
+      setDateRange(customFrom || null, customTo || null)
+    } else {
+      const opt = durationOptions.find((d) => d.label === tempPreset)
+      if (opt) {
+        const range = opt.getRange()
+        setDatePreset(tempPreset)
+        setDateRange(range.from || null, range.to || null)
+      }
+    }
     setOpen(false)
   }
+
+  const currentLabel = datePreset || "All Time"
 
   return (
     <>
@@ -44,7 +63,7 @@ export default function DateFilter() {
         <Calendar className="h-4 w-4 text-accent" />
         <div className="flex-1">
           <span className="text-white/40 text-[10px] uppercase tracking-wider">Time</span>
-          <div className="font-medium">{datePreset}</div>
+          <div className="font-medium">{currentLabel}</div>
         </div>
       </button>
 
@@ -60,29 +79,8 @@ export default function DateFilter() {
                 <span className="text-lg font-semibold text-white">Date Filter</span>
               </div>
               <button onClick={() => setOpen(false)} className="rounded-2xl p-2 text-white/50 hover:bg-white/10 hover:text-white transition-colors">
-                <X className="h-5 w-5" />
+                <span className="text-xl">&times;</span>
               </button>
-            </div>
-
-            <div className="mb-6">
-              <span className="mb-3 block text-[10px] font-medium text-white/40 uppercase tracking-wider">Range</span>
-              <div className="grid grid-cols-2 gap-2">
-                {rangeOptions.map((option) => (
-                  <button
-                    key={option.label}
-                    onClick={() => setDatePreset(option.label)}
-                    className={cn(
-                      "rounded-2xl px-4 py-3 text-left transition-all",
-                      datePreset === option.label
-                        ? "bg-accent text-white shadow-[0_0_25px_rgba(255,106,43,0.3)]"
-                        : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-                    )}
-                  >
-                    <div className="text-sm font-medium">{option.label}</div>
-                    <div className="text-[10px] opacity-60">{option.desc}</div>
-                  </button>
-                ))}
-              </div>
             </div>
 
             <div className="mb-6">
@@ -91,10 +89,10 @@ export default function DateFilter() {
                 {durationOptions.map((option) => (
                   <button
                     key={option.label}
-                    onClick={() => handleDurationSelect(option.label)}
+                    onClick={() => setTempPreset(option.label)}
                     className={cn(
                       "rounded-2xl px-4 py-2.5 text-sm font-medium transition-all",
-                      datePreset === option.label
+                      tempPreset === option.label
                         ? "bg-accent text-white shadow-[0_0_25px_rgba(255,106,43,0.3)]"
                         : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
                     )}
@@ -102,11 +100,22 @@ export default function DateFilter() {
                     {option.label}
                   </button>
                 ))}
+                <button
+                  onClick={() => setTempPreset("Custom")}
+                  className={cn(
+                    "rounded-2xl px-4 py-2.5 text-sm font-medium transition-all",
+                    tempPreset === "Custom"
+                      ? "bg-accent text-white shadow-[0_0_25px_rgba(255,106,43,0.3)]"
+                      : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+                  )}
+                >
+                  Custom
+                </button>
               </div>
             </div>
 
             {isCustom && (
-              <div className="space-y-4 rounded-2xl bg-white/5 p-5 border border-white/5">
+              <div className="space-y-4 rounded-2xl bg-white/5 p-5 border border-white/5 mb-6">
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-white/50">Start date</label>
                   <input
@@ -125,14 +134,15 @@ export default function DateFilter() {
                     className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors"
                   />
                 </div>
-                <button
-                  onClick={handleApply}
-                  className="w-full rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent/90 transition-all shadow-[0_0_25px_rgba(255,106,43,0.3)]"
-                >
-                  Apply
-                </button>
               </div>
             )}
+
+            <button
+              onClick={handleApply}
+              className="w-full rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-white hover:bg-accent/90 transition-all shadow-[0_0_25px_rgba(255,106,43,0.3)]"
+            >
+              Apply
+            </button>
           </div>
         </div>
       )}

@@ -15,6 +15,7 @@ export interface CompetitorListResponse {
 
 export interface LocationRanking {
   location_id: string
+  location_name: string
   avg_rating: number
   review_count: number
   sentiment_breakdown: Record<string, number>

@@ -43,6 +43,8 @@ def _resolve_location_ids(db: Session, location_names: list[str]) -> list[str]:
 def get_dashboard(
     db: Annotated[Session, Depends(get_db)],
     locations: Optional[str] = Query(None, description="Comma-separated location names to filter by"),
+    date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
 ):
     now = datetime.now(timezone.utc)
     loc_resolver = _build_location_resolver(db)
@@ -54,6 +56,19 @@ def get_dashboard(
             loc_ids = _resolve_location_ids(db, filter_names)
             if loc_ids:
                 base_query = base_query.filter(Review.location_id.in_(loc_ids))
+
+    if date_from:
+        try:
+            dt_from = datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            base_query = base_query.filter(Review.created_at >= dt_from)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            dt_to = datetime.strptime(date_to, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
+            base_query = base_query.filter(Review.created_at < dt_to)
+        except ValueError:
+            pass
 
     # ── KPIs ──
     total = base_query.count()
