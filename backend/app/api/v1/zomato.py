@@ -81,7 +81,9 @@ async def fetch_zomato_reviews(body: ZomatoAuthRequest):
     async with httpx.AsyncClient(timeout=60) as client:
         for res_id in body.restaurant_ids:
             offset = 0
-            while True:
+            pages = 0
+            max_pages = 20
+            while pages < max_pages:
                 resp = await client.get(
                     f"{ZOMATO_API_BASE}/reviews/get/all",
                     headers=headers,
@@ -102,6 +104,7 @@ async def fetch_zomato_reviews(body: ZomatoAuthRequest):
                 if not pagination.get("has_more"):
                     break
                 offset = pagination.get("next_start", offset + len(reviews))
+                pages += 1
 
     db = SessionLocal()
     saved_count = 0
