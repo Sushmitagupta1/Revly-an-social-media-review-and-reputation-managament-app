@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -13,6 +13,28 @@ from app.models.review import Review
 logger = logging.getLogger("zomato_sync")
 
 ZOMATO_API_BASE = "https://api.zomato.com/merchant-gw/web"
+
+
+def _parse_display_date(display_date: str | None) -> datetime | None:
+    if not display_date:
+        return None
+    display_date = display_date.strip()
+    now = datetime.now(timezone.utc)
+    if display_date.lower() == "yesterday":
+        return (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    if display_date.lower() == "today":
+        return now.replace(hour=0, minute=0, second=0, microsecond=0)
+    try:
+        dt = datetime.strptime(display_date, "%d %b %Y")
+        return dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        pass
+    try:
+        dt = datetime.strptime(display_date, "%d %B %Y")
+        return dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        pass
+    return None
 
 
 def _build_headers(integration: Integration) -> dict:
@@ -152,6 +174,7 @@ def sync_zomato_reviews():
 
                             rating = int(info.get("rating", 0))
                             text = r.get("review_text", "")
+                            display_date = info.get("display_date", "")
                             review = Review(
                                 brand_id=MOCK_BRAND_ID,
                                 platform="zomato",
@@ -163,6 +186,9 @@ def sync_zomato_reviews():
                                 sentiment=_classify_sentiment(rating, text),
                                 topics=_extract_topics(text),
                             )
+                            review_date = _parse_display_date(display_date)
+                            if review_date:
+                                review.created_at = review_date
                             db.add(review)
                             new_count += 1
 

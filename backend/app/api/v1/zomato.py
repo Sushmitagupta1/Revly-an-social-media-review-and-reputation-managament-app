@@ -1,4 +1,7 @@
 import json
+import re
+from datetime import datetime, timedelta, timezone
+
 import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -10,6 +13,28 @@ from app.models.review import Review
 router = APIRouter()
 
 ZOMATO_API_BASE = "https://api.zomato.com/merchant-gw/web"
+
+
+def _parse_display_date(display_date: str | None) -> datetime | None:
+    if not display_date:
+        return None
+    display_date = display_date.strip()
+    now = datetime.now(timezone.utc)
+    if display_date.lower() == "yesterday":
+        return (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    if display_date.lower() == "today":
+        return now.replace(hour=0, minute=0, second=0, microsecond=0)
+    try:
+        dt = datetime.strptime(display_date, "%d %b %Y")
+        return dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        pass
+    try:
+        dt = datetime.strptime(display_date, "%d %B %Y")
+        return dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        pass
+    return None
 
 
 class ZomatoAuthRequest(BaseModel):
@@ -166,6 +191,9 @@ async def fetch_zomato_reviews(body: ZomatoAuthRequest):
                 sentiment=_classify_sentiment(rev["rating"], rev["text"]),
                 topics=_extract_topics(rev["text"]),
             )
+            review_date = _parse_display_date(rev.get("display_date"))
+            if review_date:
+                review.created_at = review_date
             db.add(review)
             saved_count += 1
         db.commit()
@@ -203,6 +231,7 @@ class BulkReviewItem(BaseModel):
     text: str = ""
     res_id: str = ""
     location_id: str = ""
+    display_date: str = ""
 
 
 class BulkImportRequest(BaseModel):
@@ -329,6 +358,9 @@ async def bulk_import_reviews(body: BulkImportRequest):
             )
             if rev.location_id:
                 review.location_id = uuid_mod.UUID(rev.location_id)
+            review_date = _parse_display_date(rev.display_date)
+            if review_date:
+                review.created_at = review_date
             db.add(review)
             saved_count += 1
         db.commit()
