@@ -43,7 +43,7 @@ async def connect_zomato(body: ZomatoAuthRequest):
     headers = _build_headers(body)
     headers["cookie"] = f"X-Zomato-Mx-Auth-Token={body.auth_token}; {body.cookies}"
 
-    async with httpx.AsyncClient(http2=True, timeout=15) as client:
+    async with httpx.AsyncClient(timeout=15) as client:
         if body.restaurant_ids:
             test_id = body.restaurant_ids[0]
         else:
@@ -78,7 +78,7 @@ async def fetch_zomato_reviews(body: ZomatoAuthRequest):
 
     all_reviews = []
 
-    async with httpx.AsyncClient(http2=True, timeout=15) as client:
+    async with httpx.AsyncClient(timeout=60) as client:
         for res_id in body.restaurant_ids:
             offset = 0
             while True:
