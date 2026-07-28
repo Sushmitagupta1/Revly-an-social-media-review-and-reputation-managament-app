@@ -42,12 +42,7 @@ export default function DateFilter() {
       setDatePreset("Custom")
       setDateRange(customFrom || null, customTo || null)
     } else {
-      const opt = durationOptions.find((d) => d.label === tempPreset)
-      if (opt) {
-        const range = opt.getRange()
-        setDatePreset(tempPreset)
-        setDateRange(range.from || null, range.to || null)
-      }
+      setDatePreset(tempPreset)
     }
     setOpen(false)
   }
