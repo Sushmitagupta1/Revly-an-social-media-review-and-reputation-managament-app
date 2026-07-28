@@ -158,6 +158,56 @@ def _parse_review(r: dict, res_id: str) -> dict:
     }
 
 
+class BulkReviewItem(BaseModel):
+    platform_review_id: str
+    reviewer_name: str
+    rating: int
+    text: str = ""
+    res_id: str = ""
+
+
+class BulkImportRequest(BaseModel):
+    reviews: list[BulkReviewItem]
+
+
+@router.post("/bulk-import")
+async def bulk_import_reviews(body: BulkImportRequest):
+    db = SessionLocal()
+    saved_count = 0
+    skipped = 0
+    try:
+        for rev in body.reviews:
+            existing = db.query(Review).filter(
+                Review.platform == "zomato",
+                Review.platform_review_id == rev.platform_review_id,
+            ).first()
+            if existing:
+                skipped += 1
+                continue
+
+            review = Review(
+                brand_id=MOCK_BRAND_ID,
+                platform="zomato",
+                platform_review_id=rev.platform_review_id,
+                reviewer_name=rev.reviewer_name,
+                rating=rev.rating,
+                text=rev.text,
+                sentiment=_classify_sentiment(rev.rating, rev.text),
+                topics=_extract_topics(rev.text),
+            )
+            db.add(review)
+            saved_count += 1
+        db.commit()
+    finally:
+        db.close()
+
+    return {
+        "success": True,
+        "saved": saved_count,
+        "skipped": skipped,
+    }
+
+
 def _classify_sentiment(rating: int, text: str | None) -> str:
     if rating >= 4:
         return "positive"
