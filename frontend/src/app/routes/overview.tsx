@@ -15,8 +15,36 @@ export default function OverviewPage() {
   const user = useAuthStore((s) => s.user)
   const selectedLocations = useFilterStore((s) => s.selectedLocations)
   const dateRange = useFilterStore((s) => s.dateRange)
+  const datePreset = useFilterStore((s) => s.datePreset)
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  function getResolvedRange(): { from: string | null; to: string | null } {
+    if (dateRange.from || dateRange.to) return dateRange
+    const now = new Date()
+    const toStr = now.toISOString().split("T")[0]
+    switch (datePreset) {
+      case "Today": {
+        const s = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        return { from: s.toISOString().split("T")[0], to: toStr }
+      }
+      case "Yesterday": {
+        const s = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+        const e = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        return { from: s.toISOString().split("T")[0], to: e.toISOString().split("T")[0] }
+      }
+      case "Past 7 Days": {
+        const s = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        return { from: s.toISOString().split("T")[0], to: toStr }
+      }
+      case "Past 30 Days": {
+        const s = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        return { from: s.toISOString().split("T")[0], to: toStr }
+      }
+      default:
+        return { from: null, to: null }
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -26,12 +54,9 @@ export default function OverviewPage() {
         if (selectedLocations.length > 0) {
           params.locations = selectedLocations.join(",")
         }
-        if (dateRange.from) {
-          params.date_from = dateRange.from
-        }
-        if (dateRange.to) {
-          params.date_to = dateRange.to
-        }
+        const resolved = getResolvedRange()
+        if (resolved.from) params.date_from = resolved.from
+        if (resolved.to) params.date_to = resolved.to
         const res = await apiClient.get("/dashboard", { params })
         if (!cancelled) setData(res.data)
       } catch (err: any) {
@@ -40,7 +65,7 @@ export default function OverviewPage() {
     }
     load()
     return () => { cancelled = true }
-  }, [selectedLocations, dateRange])
+  }, [selectedLocations, dateRange, datePreset])
 
   if (error) {
     return (
