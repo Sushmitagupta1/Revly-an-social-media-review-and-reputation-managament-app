@@ -23,6 +23,14 @@ scheduler = BackgroundScheduler()
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+    from alembic.config import Config as AlembicConfig
+    from alembic import command
+    alembic_cfg = AlembicConfig(Path(__file__).resolve().parent.parent / "alembic.ini")
+    alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+    try:
+        command.upgrade(alembic_cfg, "head")
+    except Exception as e:
+        logger.warning(f"Alembic migration failed (may be OK): {e}")
     from app.seed_admin import seed_admin
     seed_admin()
 
