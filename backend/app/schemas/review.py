@@ -15,6 +15,7 @@ class ReviewResponse(BaseModel):
     topics: list[str] | None
     is_resolved: bool
     location_id: uuid.UUID | None
+    location_name: str | None = None
     created_at: datetime
 
     class Config:

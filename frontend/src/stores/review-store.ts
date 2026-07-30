@@ -17,8 +17,10 @@ interface ReviewState {
     date_from: string | null
     date_to: string | null
   }
+  locations: string[]
   setFilters: (filters: Partial<ReviewState["filters"]>) => void
   setPage: (page: number) => void
+  setLocations: (locations: string[]) => void
   fetchReviews: () => Promise<void>
   fetchStats: () => Promise<void>
   generateReply: (reviewId: string, tone?: string) => Promise<Reply>
@@ -36,6 +38,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   stats: null,
   isLoading: false,
   filters: { search: "", platform: null, rating: null, sentiment: null, date_from: null, date_to: null },
+  locations: [],
 
   setFilters: (filters) => {
     set((s) => ({ filters: { ...s.filters, ...filters }, page: 1 }))
@@ -47,9 +50,14 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     get().fetchReviews()
   },
 
+  setLocations: (locations) => {
+    set({ locations })
+    get().fetchReviews()
+  },
+
   fetchReviews: async () => {
     set({ isLoading: true })
-    const { filters, page } = get()
+    const { filters, page, locations } = get()
     const params = new URLSearchParams()
     if (filters.search) params.set("search", filters.search)
     if (filters.platform) params.set("platform", filters.platform)
@@ -57,6 +65,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     if (filters.sentiment) params.set("sentiment", filters.sentiment)
     if (filters.date_from) params.set("date_from", filters.date_from)
     if (filters.date_to) params.set("date_to", filters.date_to)
+    if (locations.length > 0) params.set("locations", locations.join(","))
     params.set("page", String(page))
     params.set("limit", "20")
 
@@ -65,7 +74,10 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   },
 
   fetchStats: async () => {
-    const { data } = await apiClient.get<ReviewStats>("/reviews/stats")
+    const { locations } = get()
+    const params = new URLSearchParams()
+    if (locations.length > 0) params.set("locations", locations.join(","))
+    const { data } = await apiClient.get<ReviewStats>(`/reviews/stats?${params}`)
     set({ stats: data })
   },
 

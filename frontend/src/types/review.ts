@@ -9,6 +9,7 @@ export interface Review {
   topics: string[] | null
   is_resolved: boolean
   location_id: string | null
+  location_name: string | null
   created_at: string
 }
 

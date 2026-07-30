@@ -38,9 +38,9 @@ export default function ReviewCard({ review, onClick }: Props) {
 
       <div className="mt-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {review.location_id && (
+          {(review.location_id || review.location_name) && (
             <span className="inline-flex items-center gap-1 rounded-full bg-card-secondary px-2 py-0.5 text-xs text-text-secondary">
-              📍 Location
+              📍 {review.location_name || "Location"}
             </span>
           )}
           {review.sentiment && (

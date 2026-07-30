@@ -15,18 +15,49 @@ from app.schemas.review import ReviewListResponse, ReviewResolveRequest, ReviewR
 router = APIRouter()
 
 
-@router.get("/stats", response_model=ReviewStatsResponse)
-def get_review_stats(db: DbSession):
-    total = db.query(func.count(Review.id)).scalar() or 0
-    avg = db.query(func.avg(Review.rating)).scalar() or 0
+def _resolve_location_ids(db: DbSession, names: list[str]) -> list[str]:
+    from app.models.location import Location
+    rows = db.query(Location.id, Location.name).all()
+    name_to_id = {r.name: str(r.id) for r in rows}
+    return [name_to_id[n] for n in names if n in name_to_id]
 
-    platform_rows = db.query(Review.platform, func.count(Review.id)).group_by(Review.platform).all()
+
+def _build_location_name_map(db: DbSession) -> dict[str, str]:
+    from app.models.location import Location
+    rows = db.query(Location.id, Location.name).all()
+    return {str(r.id): r.name for r in rows}
+
+
+def _apply_location_filter(query, db: DbSession, locations: str | None):
+    if not locations:
+        return query
+    names = [n.strip() for n in locations.split(",") if n.strip()]
+    if not names:
+        return query
+    ids = _resolve_location_ids(db, names)
+    if ids:
+        query = query.filter(Review.location_id.in_(ids))
+    return query
+
+
+@router.get("/stats", response_model=ReviewStatsResponse)
+def get_review_stats(
+    db: DbSession,
+    locations: str | None = None,
+):
+    query = db.query(Review)
+    query = _apply_location_filter(query, db, locations)
+
+    total = query.with_entities(func.count(Review.id)).scalar() or 0
+    avg = query.with_entities(func.avg(Review.rating)).scalar() or 0
+
+    platform_rows = query.with_entities(Review.platform, func.count(Review.id)).group_by(Review.platform).all()
     by_platform = {p: c for p, c in platform_rows}
 
-    sentiment_rows = db.query(Review.sentiment, func.count(Review.id)).group_by(Review.sentiment).all()
+    sentiment_rows = query.with_entities(Review.sentiment, func.count(Review.id)).group_by(Review.sentiment).all()
     by_sentiment = {s: c for s, c in sentiment_rows if s}
 
-    rating_rows = db.query(Review.rating, func.count(Review.id)).group_by(Review.rating).all()
+    rating_rows = query.with_entities(Review.rating, func.count(Review.id)).group_by(Review.rating).all()
     by_rating = {r: c for r, c in rating_rows}
 
     return ReviewStatsResponse(
@@ -41,6 +72,7 @@ def get_review_stats(db: DbSession):
 @router.get("", response_model=ReviewListResponse)
 def list_reviews(
     db: DbSession,
+    locations: str | None = None,
     search: str | None = None,
     platform: str | None = None,
     rating: int | None = None,
@@ -51,6 +83,7 @@ def list_reviews(
     limit: int = Query(20, ge=1, le=100),
 ):
     query = db.query(Review)
+    query = _apply_location_filter(query, db, locations)
 
     if search:
         query = query.filter(Review.text.ilike(f"%{search}%"))
@@ -77,8 +110,15 @@ def list_reviews(
     pages = math.ceil(total / limit) if total > 0 else 1
     reviews = query.order_by(Review.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
 
+    loc_map = _build_location_name_map(db)
+    response_items = []
+    for r in reviews:
+        item = ReviewResponse.model_validate(r)
+        item.location_name = loc_map.get(str(r.location_id)) if r.location_id else None
+        response_items.append(item)
+
     return ReviewListResponse(
-        reviews=[ReviewResponse.model_validate(r) for r in reviews],
+        reviews=response_items,
         total=total,
         page=page,
         pages=pages,

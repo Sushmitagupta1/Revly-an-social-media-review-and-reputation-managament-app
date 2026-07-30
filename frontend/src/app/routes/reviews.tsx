@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { Search, Download } from "lucide-react"
 import { useReviewStore } from "@/stores/review-store"
+import { useFilterStore } from "@/stores/filter-store"
 import { downloadReviewsCsv } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -16,15 +17,17 @@ import type { Review } from "@/types/review"
 export default function ReviewsPage() {
   const {
     reviews, page, pages, stats, isLoading,
-    filters, setFilters, setPage, fetchReviews, fetchStats,
+    filters, setFilters, setPage, fetchReviews, fetchStats, setLocations,
   } = useReviewStore()
+  const selectedLocations = useFilterStore((s) => s.selectedLocations)
   const [selectedReview, setSelectedReview] = useState<Review | null>(null)
   const [searchInput, setSearchInput] = useState(filters.search)
 
   useEffect(() => {
+    setLocations(selectedLocations)
     fetchReviews()
     fetchStats()
-  }, [])
+  }, [selectedLocations])
 
   const handleSearch = useCallback(() => {
     setFilters({ search: searchInput })
