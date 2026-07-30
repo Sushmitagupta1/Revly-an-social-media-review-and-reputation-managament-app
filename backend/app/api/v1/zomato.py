@@ -370,6 +370,30 @@ async def manual_sync():
     return {"success": True, "message": "Sync completed"}
 
 
+@router.post("/refresh-session")
+async def refresh_zomato_session():
+    from app.models.integration import Integration
+    db = SessionLocal()
+    try:
+        integration = db.query(Integration).filter(
+            Integration.brand_id == MOCK_BRAND_ID,
+            Integration.platform == "zomato",
+            Integration.is_connected == True,
+        ).first()
+        if not integration or not integration.auth_token:
+            raise HTTPException(status_code=400, detail="No connected Zomato integration found")
+        from app.services.zomato_sync import refresh_zomato_session as do_refresh
+        ok = do_refresh(integration)
+        db.commit()
+        return {
+            "success": ok,
+            "message": "Session refreshed" if ok else "Session refresh failed",
+            "last_synced": integration.last_synced,
+        }
+    finally:
+        db.close()
+
+
 @router.post("/bulk-import")
 async def bulk_import_reviews(body: BulkImportRequest):
     import uuid as uuid_mod

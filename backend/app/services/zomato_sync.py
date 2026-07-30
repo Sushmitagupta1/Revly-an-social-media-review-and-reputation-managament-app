@@ -13,6 +13,91 @@ from app.models.review import Review
 logger = logging.getLogger("zomato_sync")
 
 ZOMATO_API_BASE = "https://api.zomato.com/merchant-gw/web"
+SET_CSRF_URL = "https://api.zomato.com/merchant-gw/set-csrf"
+NPS_GET_URL = "https://www.zomato.com/merchant-api/nps/get"
+
+
+def _parse_cookie_dict(raw: str) -> dict[str, str]:
+    """Parse a semi-colon separated Cookie string into a dict."""
+    result = {}
+    for part in raw.split(";"):
+        part = part.strip()
+        if "=" in part:
+            key, _, val = part.partition("=")
+            result[key.strip()] = val.strip()
+    return result
+
+
+def _update_cookies_from_response(integration, cookie_str: str, resp):
+    """Extract Set-Cookie headers from response and merge into integration.cookies."""
+    cookies = _parse_cookie_dict(cookie_str)
+    for set_cookie in resp.headers.get_list("set-cookie"):
+        name = set_cookie.split("=", 1)[0].strip()
+        rest = set_cookie.split(";", 1)[0]
+        value = rest.split("=", 1)[1].strip() if "=" in rest else ""
+        cookies[name] = value
+    cookies.pop("X-Zomato-Mx-Auth-Token", None)
+    new_parts = [f"{k}={v}" for k, v in cookies.items()]
+    integration.cookies = "; ".join(new_parts)
+
+
+def refresh_zomato_session(integration) -> bool:
+    """Refresh Zomato session cookies by calling keepalive endpoints."""
+    cookie_str = f"X-Zomato-Mx-Auth-Token={integration.auth_token}; {integration.cookies or ''}"
+    headers = {
+        "accept": "application/json, text/plain, */*",
+        "x-client-id": "zomato_web_merchant",
+        "x-zomato-app-version": "2",
+        "x-zomato-csrft": integration.csrf_token or "",
+        "x-zomato-mx-csrf-token": integration.mx_csrf_token or "",
+        "x-zomato-source-identifier": "merchant-dashboard",
+        "x-zomato-trace-id": "web-revly-autosync",
+        "referer": "https://www.zomato.com/",
+        "origin": "https://www.zomato.com",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+        "cookie": cookie_str,
+    }
+    try:
+        with httpx.Client(timeout=15) as client:
+            # 1. Refresh ALB session stickiness (7-day cookies)
+            nps_ok = True
+            try:
+                nps_resp = client.get(NPS_GET_URL, headers=headers)
+                if nps_resp.status_code == 200:
+                    _update_cookies_from_response(integration, cookie_str, nps_resp)
+                    cookie_str = f"X-Zomato-Mx-Auth-Token={integration.auth_token}; {integration.cookies}"
+                    headers["cookie"] = cookie_str
+                else:
+                    nps_ok = False
+                    logger.warning(f"NPS/get returned {nps_resp.status_code}")
+            except Exception as e:
+                nps_ok = False
+                logger.warning(f"NPS/get error: {e}")
+
+            # 2. Refresh CSRF / bot management cookie (2-hour bm_sv)
+            csrf_resp = client.post(SET_CSRF_URL, headers=headers, content=b"")
+            if csrf_resp.status_code != 200:
+                logger.warning(f"set-csrf returned {csrf_resp.status_code}")
+                return False
+
+            _update_cookies_from_response(integration, cookie_str, csrf_resp)
+
+            try:
+                body = csrf_resp.json()
+                new_token = body.get("refresh_token") or body.get("token")
+                if new_token:
+                    integration.auth_token = new_token
+                if body.get("csrf"):
+                    integration.csrf_token = body["csrf"]
+                if body.get("mx_csrf"):
+                    integration.mx_csrf_token = body["mx_csrf"]
+            except (ValueError, AttributeError):
+                pass
+
+            return True
+    except Exception as e:
+        logger.error(f"Session refresh error: {e}")
+        return False
 
 
 def _parse_display_date(display_date: str | None) -> datetime | None:
@@ -126,6 +211,10 @@ def sync_zomato_reviews():
         if not restaurant_ids:
             logger.warning("No restaurant IDs configured, skipping sync")
             return
+
+        refreshed = refresh_zomato_session(integration)
+        if not refreshed:
+            logger.warning("Session refresh failed, proceeding with existing tokens")
 
         headers = _build_headers(integration)
         new_count = 0
