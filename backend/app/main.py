@@ -15,6 +15,25 @@ from app.models import Base
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("zomato_sync")
 
+
+def _run_migrations(engine):
+    """Add missing columns for integrations table."""
+    import sqlalchemy as sa
+    from sqlalchemy import inspect
+    try:
+        inspector = inspect(engine)
+        columns = [c["name"] for c in inspector.get_columns("integrations")]
+        missing = [c for c in ["auth_token", "csrf_token", "mx_csrf_token", "cookies", "restaurant_ids"] if c not in columns]
+        if missing:
+            logger.info(f"Adding missing columns to integrations table: {missing}")
+            with engine.connect() as conn:
+                for col in missing:
+                    conn.execute(sa.text(f"ALTER TABLE integrations ADD COLUMN {col} TEXT"))
+                conn.commit()
+            logger.info("Migration complete")
+    except Exception as e:
+        logger.warning(f"Migration check failed (table may not exist yet): {e}")
+
 app = FastAPI(title="Revly API", version="0.1.0")
 
 scheduler = BackgroundScheduler()
@@ -23,14 +42,7 @@ scheduler = BackgroundScheduler()
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
-    from alembic.config import Config as AlembicConfig
-    from alembic import command
-    alembic_cfg = AlembicConfig(Path(__file__).resolve().parent.parent / "alembic.ini")
-    alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-    try:
-        command.upgrade(alembic_cfg, "head")
-    except Exception as e:
-        logger.warning(f"Alembic migration failed (may be OK): {e}")
+    _run_migrations(engine)
     from app.seed_admin import seed_admin
     seed_admin()
 
