@@ -372,6 +372,7 @@ async def manual_sync():
 
 @router.post("/refresh-session")
 async def refresh_zomato_session():
+    import traceback
     from app.models.integration import Integration
     db = SessionLocal()
     try:
@@ -390,6 +391,11 @@ async def refresh_zomato_session():
             "message": "Session refreshed" if ok else "Session refresh failed",
             "last_synced": integration.last_synced,
         }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Refresh error: {e}\n{traceback.format_exc()}")
     finally:
         db.close()
 
