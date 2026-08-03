@@ -5,6 +5,7 @@ import PraiseCard from "@/components/praises/praise-card"
 import LoadingSpinner from "@/components/shared/loading-spinner"
 import EmptyState from "@/components/shared/empty-state"
 import BackButton from "@/components/shared/back-button"
+import TopicDonut from "@/components/shared/topic-donut"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -103,19 +104,7 @@ export default function PraisesPage() {
           <div className="lg:col-span-1">
             <div className="rounded-[20px] bg-card p-5">
               <h3 className="mb-4 text-[15px] font-semibold text-text">Topic Breakdown</h3>
-              <div className="space-y-3">
-                {topicCounts.length > 0 ? topicCounts.map((t) => (
-                  <div key={t.topic}>
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="text-[12px] font-medium text-text">{t.topic}</span>
-                      <span className="text-[12px] font-bold text-text">{t.count}</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-card-secondary">
-                      <div className="h-full rounded-full bg-success transition-all duration-500" style={{ width: `${(t.count / maxTopicCount) * 100}%` }} />
-                    </div>
-                  </div>
-                )) : <p className="text-[13px] text-text-secondary">No data available</p>}
-              </div>
+              <TopicDonut data={topicCounts} />
             </div>
           </div>
         </div>
