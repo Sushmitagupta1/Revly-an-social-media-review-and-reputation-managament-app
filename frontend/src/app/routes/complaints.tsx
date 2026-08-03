@@ -22,7 +22,7 @@ const TOPICS = [
 ]
 
 export default function ComplaintsPage() {
-  const { reviews, total, page, pages, isLoading, topicCounts, topic, setTopic, setPage, fetchComplaints, resolveReview } = useComplaintsStore()
+  const { reviews, total, page, pages, isLoading, topicCounts, locationCounts, topic, setTopic, setPage, fetchComplaints, resolveReview } = useComplaintsStore()
   const { selectedLocations } = useFilterStore()
   const [view, setView] = useState<"location" | "brand">("location")
 
@@ -30,7 +30,8 @@ export default function ComplaintsPage() {
 
   const resolvedCount = reviews.filter((r) => r.is_resolved).length
   const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0
-  const maxTopicCount = Math.max(...topicCounts.map((t) => t.count), 1)
+  const breakdownData = view === "location" ? locationCounts.slice(0, 6) : topicCounts
+  const maxBreakdown = Math.max(...breakdownData.map((t) => t.count), 1)
 
   return (
     <div className="space-y-6">
@@ -78,26 +79,31 @@ export default function ComplaintsPage() {
         <EmptyState title="No complaints found" description="No negative reviews match your filters." />
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-1">
+          <div className="space-y-6">
             <div className="rounded-[20px] bg-card p-5">
               <h3 className="mb-4 text-[15px] font-semibold text-text">
                 {view === "location" ? "Complaints by Outlet" : "Complaint Categories"}
               </h3>
               <div className="space-y-3">
-                {topicCounts.length > 0 ? (view === "location" ? topicCounts.slice(0, 6) : topicCounts).map((t) => (
+                {breakdownData.length > 0 ? breakdownData.map((t) => (
                   <div key={t.topic}>
                     <div className="mb-1 flex items-center justify-between">
                       <span className="text-[12px] font-medium text-text">{t.topic}</span>
                       <span className="text-[12px] font-bold text-danger">{t.count}</span>
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-card-secondary">
-                      <div className="h-full rounded-full bg-danger transition-all duration-500" style={{ width: `${(t.count / maxTopicCount) * 100}%` }} />
+                      <div className="h-full rounded-full bg-danger transition-all duration-500" style={{ width: `${(t.count / maxBreakdown) * 100}%` }} />
                     </div>
                   </div>
                 )) : (
                   <p className="text-[13px] text-text-secondary">No data available</p>
                 )}
               </div>
+            </div>
+
+            <div className="rounded-[20px] bg-card p-5">
+              <h3 className="mb-4 text-[15px] font-semibold text-text">Topic Breakdown</h3>
+              <TopicDonut data={topicCounts} />
             </div>
           </div>
 
@@ -109,13 +115,6 @@ export default function ComplaintsPage() {
               <Button variant="ghost" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</Button>
               <span className="text-[13px] text-text-secondary">Page {page} of {pages}</span>
               <Button variant="ghost" size="sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</Button>
-            </div>
-          </div>
-
-          <div className="lg:col-span-1">
-            <div className="rounded-[20px] bg-card p-5">
-              <h3 className="mb-4 text-[15px] font-semibold text-text">Topic Breakdown</h3>
-              <TopicDonut data={topicCounts} />
             </div>
           </div>
         </div>

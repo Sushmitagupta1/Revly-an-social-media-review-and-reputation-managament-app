@@ -3,6 +3,7 @@ import math
 from collections import Counter
 
 from fastapi import APIRouter, Query
+from sqlalchemy import func
 
 from app.api.deps import CurrentUser, DbSession
 from app.models.review import Review
@@ -17,6 +18,12 @@ def _resolve_location_ids(db, location_names: list[str]) -> list[str]:
     rows = db.query(Location.id, Location.name).all()
     name_to_id = {r.name: str(r.id) for r in rows}
     return [name_to_id[n] for n in location_names if n in name_to_id]
+
+
+def _build_location_name_map(db) -> dict[str, str]:
+    from app.models.location import Location
+    rows = db.query(Location.id, Location.name).all()
+    return {str(r.id): r.name for r in rows}
 
 
 @router.get("", response_model=ComplaintListResponse)
@@ -67,6 +74,24 @@ def list_complaints(
         for t, c in topic_counter.most_common()
     ]
 
+    loc_name_map = _build_location_name_map(db)
+    loc_query = (
+        db.query(Review.location_id, func.count(Review.id))
+        .filter(Review.sentiment == "negative", Review.location_id.isnot(None))
+    )
+    if loc_ids:
+        loc_query = loc_query.filter(Review.location_id.in_(loc_ids))
+    loc_rows = loc_query.group_by(Review.location_id).all()
+
+    loc_counter: Counter = Counter()
+    for lid, c in loc_rows:
+        loc_counter[loc_name_map.get(str(lid), "Unknown")] += c
+
+    location_counts = [
+        TopicCount(topic=t, count=c)
+        for t, c in loc_counter.most_common()
+    ]
+
     total = query.count()
     pages = math.ceil(total / limit) if total > 0 else 1
     reviews = query.order_by(Review.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
@@ -77,4 +102,5 @@ def list_complaints(
         page=page,
         pages=pages,
         topic_counts=topic_counts,
+        location_counts=location_counts,
     )

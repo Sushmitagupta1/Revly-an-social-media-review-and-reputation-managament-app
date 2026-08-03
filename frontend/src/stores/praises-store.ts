@@ -11,13 +11,14 @@ interface PraisesState {
   isLoading: boolean
   platform: string | null
   topicCounts: TopicCount[]
+  locationCounts: TopicCount[]
   setPlatform: (p: string | null) => void
   setPage: (p: number) => void
   fetchPraises: (locations?: string[]) => Promise<void>
 }
 
 export const usePraisesStore = create<PraisesState>((set, get) => ({
-  reviews: [], total: 0, page: 1, pages: 1, isLoading: false, platform: null, topicCounts: [],
+  reviews: [], total: 0, page: 1, pages: 1, isLoading: false, platform: null, topicCounts: [], locationCounts: [],
   setPlatform: (platform) => { set({ platform, page: 1 }); get().fetchPraises() },
   setPage: (page) => { set({ page }); get().fetchPraises() },
   fetchPraises: async (locations?: string[]) => {
@@ -27,6 +28,6 @@ export const usePraisesStore = create<PraisesState>((set, get) => ({
     if (platform) params.set("platform", platform)
     if (locations && locations.length > 0) params.set("location", locations.join(","))
     const { data } = await apiClient.get(`/praises?${params}`)
-    set({ reviews: data.reviews, total: data.total, pages: data.pages, topicCounts: data.topic_counts || [], isLoading: false })
+    set({ reviews: data.reviews, total: data.total, pages: data.pages, topicCounts: data.topic_counts || [], locationCounts: data.location_counts || [], isLoading: false })
   },
 }))

@@ -51,6 +51,7 @@ class ComplaintListResponse(BaseModel):
     page: int
     pages: int
     topic_counts: list[TopicCount]
+    location_counts: list[TopicCount]
 
 
 class PraiseListResponse(BaseModel):
@@ -59,6 +60,7 @@ class PraiseListResponse(BaseModel):
     page: int
     pages: int
     topic_counts: list[TopicCount]
+    location_counts: list[TopicCount]
 
 
 class ReviewStatsResponse(BaseModel):
