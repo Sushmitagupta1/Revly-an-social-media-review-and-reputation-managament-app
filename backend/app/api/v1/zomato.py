@@ -1,3 +1,4 @@
+import base64
 import json
 import re
 from datetime import datetime, timedelta, timezone
@@ -6,6 +7,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from app.api.deps import DbSession
 from app.core.database import SessionLocal
 from app.core.constants import MOCK_BRAND_ID
 from app.models.review import Review
@@ -18,12 +20,29 @@ ZOMATO_API_BASE = "https://api.zomato.com/merchant-gw/web"
 def _parse_display_date(display_date: str | None) -> datetime | None:
     if not display_date:
         return None
-    display_date = display_date.strip()
+    display_date = display_date.strip().lower()
     now = datetime.now(timezone.utc)
-    if display_date.lower() == "yesterday":
+    if display_date == "yesterday":
         return (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-    if display_date.lower() == "today":
+    if display_date == "today":
         return now.replace(hour=0, minute=0, second=0, microsecond=0)
+    m = re.match(r"^(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months)\s+ago$", display_date)
+    if m:
+        n = int(m.group(1))
+        unit = m.group(2)
+        if unit.startswith("month"):
+            td = timedelta(days=30 * n)
+        elif unit.startswith("week"):
+            td = timedelta(weeks=n)
+        elif unit.startswith("day"):
+            td = timedelta(days=n)
+        elif unit.startswith("hour"):
+            td = timedelta(hours=n)
+        elif unit.startswith("minute"):
+            td = timedelta(minutes=n)
+        else:
+            td = timedelta(seconds=n)
+        return (now - td).replace(hour=0, minute=0, second=0, microsecond=0)
     try:
         dt = datetime.strptime(display_date, "%d %b %Y")
         return dt.replace(tzinfo=timezone.utc)
@@ -35,6 +54,18 @@ def _parse_display_date(display_date: str | None) -> datetime | None:
     except ValueError:
         pass
     return None
+
+
+def _restaurant_ids_from_jwt(auth_token: str) -> list[str]:
+    """Extract the merchant's restaurant ids from the Zomato JWT payload (rrm)."""
+    try:
+        payload = auth_token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        data = json.loads(base64.urlsafe_b64decode(payload))
+        rrm = data.get("rrm") or {}
+        return [str(k) for k in rrm.keys()]
+    except Exception:
+        return []
 
 
 class ZomatoAuthRequest(BaseModel):
@@ -65,6 +96,9 @@ def _build_headers(body: ZomatoAuthRequest) -> dict:
 async def connect_zomato(body: ZomatoAuthRequest):
     if not body.auth_token:
         raise HTTPException(status_code=400, detail="Auth token is required")
+
+    if not body.restaurant_ids:
+        body.restaurant_ids = _restaurant_ids_from_jwt(body.auth_token)
 
     headers = _build_headers(body)
     headers["cookie"] = f"X-Zomato-Mx-Auth-Token={body.auth_token}; {body.cookies}"
@@ -129,6 +163,29 @@ async def connect_zomato(body: ZomatoAuthRequest):
         "message": f"Zomato connected. Found {review_count} reviews for restaurant {test_id}. Auto-sync enabled (every 15 min).",
         "review_count": review_count,
     }
+
+
+class RestaurantIdsRequest(BaseModel):
+    restaurant_ids: list[str]
+
+
+@router.post("/restaurants")
+async def update_restaurants(body: RestaurantIdsRequest, db: DbSession):
+    if not body.restaurant_ids:
+        raise HTTPException(status_code=400, detail="restaurant_ids is required")
+
+    from app.models.integration import Integration
+
+    integration = db.query(Integration).filter(
+        Integration.brand_id == MOCK_BRAND_ID,
+        Integration.platform == "zomato",
+    ).first()
+    if not integration:
+        raise HTTPException(status_code=404, detail="No Zomato integration found")
+
+    integration.restaurant_ids = json.dumps(body.restaurant_ids)
+    db.commit()
+    return {"success": True, "restaurant_ids": body.restaurant_ids}
 
 
 @router.post("/fetch-reviews")

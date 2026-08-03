@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -103,12 +104,29 @@ def refresh_zomato_session(integration) -> bool:
 def _parse_display_date(display_date: str | None) -> datetime | None:
     if not display_date:
         return None
-    display_date = display_date.strip()
+    display_date = display_date.strip().lower()
     now = datetime.now(timezone.utc)
-    if display_date.lower() == "yesterday":
+    if display_date == "yesterday":
         return (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-    if display_date.lower() == "today":
+    if display_date == "today":
         return now.replace(hour=0, minute=0, second=0, microsecond=0)
+    m = re.match(r"^(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months)\s+ago$", display_date)
+    if m:
+        n = int(m.group(1))
+        unit = m.group(2)
+        if unit.startswith("month"):
+            td = timedelta(days=30 * n)
+        elif unit.startswith("week"):
+            td = timedelta(weeks=n)
+        elif unit.startswith("day"):
+            td = timedelta(days=n)
+        elif unit.startswith("hour"):
+            td = timedelta(hours=n)
+        elif unit.startswith("minute"):
+            td = timedelta(minutes=n)
+        else:
+            td = timedelta(seconds=n)
+        return (now - td).replace(hour=0, minute=0, second=0, microsecond=0)
     try:
         dt = datetime.strptime(display_date, "%d %b %Y")
         return dt.replace(tzinfo=timezone.utc)

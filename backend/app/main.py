@@ -46,10 +46,14 @@ def on_startup():
     from app.seed_admin import seed_admin
     seed_admin()
 
+    from datetime import datetime
     from app.services.zomato_sync import sync_zomato_reviews
-    scheduler.add_job(sync_zomato_reviews, "interval", minutes=15, id="zomato_sync")
+    scheduler.add_job(
+        sync_zomato_reviews, "interval", minutes=15, id="zomato_sync",
+        next_run_time=datetime.now(),
+    )
     scheduler.start()
-    logger.info("Zomato auto-sync scheduler started (every 15 minutes)")
+    logger.info("Zomato auto-sync scheduler started (every 15 minutes, first run immediately)")
 
 
 @app.on_event("shutdown")
