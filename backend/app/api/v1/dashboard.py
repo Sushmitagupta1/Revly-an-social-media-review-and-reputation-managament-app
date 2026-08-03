@@ -108,7 +108,12 @@ def get_dashboard(
         trend_start = _to_utc(earliest) if earliest else now - timedelta(days=30)
         trend_end = now
         range_days = (trend_end - trend_start).days
-        granularity = "day" if range_days <= 45 else "week"
+        if range_days <= 45:
+            granularity = "day"
+        elif range_days <= 365:
+            granularity = "week"
+        else:
+            granularity = "month"
     else:
         trend_start = dt_from or (now - timedelta(days=30))
         trend_end = dt_to or now
@@ -117,7 +122,12 @@ def get_dashboard(
         if trend_start >= trend_end:
             trend_start = trend_end - timedelta(days=1)
         range_days = (trend_end - trend_start).days
-        granularity = "day" if range_days <= 45 else "week"
+        if range_days <= 45:
+            granularity = "day"
+        elif range_days <= 365:
+            granularity = "week"
+        else:
+            granularity = "month"
 
     sentiment_by_day: dict = defaultdict(lambda: [0, 0.0])  # [count, rating_sum]
     complaints_by_day: dict = defaultdict(int)
@@ -130,6 +140,8 @@ def get_dashboard(
             continue
         if granularity == "week":
             key = ts.date() - timedelta(days=ts.date().weekday())
+        elif granularity == "month":
+            key = ts.date().replace(day=1)
         else:
             key = ts.date()
         sentiment_by_day[key][0] += 1
@@ -161,6 +173,14 @@ def get_dashboard(
         while day <= end_day:
             _append_bucket(day)
             day += timedelta(days=1)
+    elif granularity == "month":
+        month = trend_start.date().replace(day=1)
+        while month <= trend_end.date():
+            _append_bucket(month)
+            if month.month == 12:
+                month = month.replace(year=month.year + 1, month=1)
+            else:
+                month = month.replace(month=month.month + 1)
     else:
         start_week = trend_start.date() - timedelta(days=trend_start.date().weekday())
         end_week = trend_end.date() - timedelta(days=1)

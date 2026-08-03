@@ -97,3 +97,35 @@ def test_dashboard_trend_unknown_location_ignores_filter(client, db_session):
     data = resp.json()
     # Unknown location name → no location filter applied (matches existing behavior)
     assert data["kpis"]["total_reviews"] == 3
+
+
+def test_dashboard_trend_all_time_uses_monthly_granularity(client, db_session):
+    db_session.query(Review).delete()
+    db_session.query(Location).delete()
+    db_session.commit()
+    loc = Location(id=uuid.uuid4(), brand_id=MOCK_BRAND_ID, name="Alpha", address="A1", city="City")
+    db_session.add(loc)
+    db_session.commit()
+    now = datetime.now(timezone.utc)
+    db_session.add_all([
+        Review(
+            brand_id=BRAND_ID, platform="google", reviewer_name="Old", rating=4,
+            text="old", sentiment="positive", topics=None, is_resolved=False,
+            location_id=loc.id, created_at=now - timedelta(days=400),
+        ),
+        Review(
+            brand_id=BRAND_ID, platform="google", reviewer_name="New", rating=2,
+            text="new", sentiment="negative", topics=None, is_resolved=False,
+            location_id=loc.id, created_at=now - timedelta(days=1),
+        ),
+    ])
+    db_session.commit()
+    resp = client.get("/api/v1/dashboard")
+    assert resp.status_code == 200
+    data = resp.json()
+    # Span > 365 days → monthly buckets; each bucket key is the 1st of a month
+    trend = data["sentiment_trend"]
+    assert len(trend) >= 13
+    for point in trend:
+        assert point["date"].endswith("-01")
+    assert sum(p["count"] for p in trend) == 2
