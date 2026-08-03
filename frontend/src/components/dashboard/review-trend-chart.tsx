@@ -12,6 +12,8 @@ function getDaysFromPreset(preset: string): number {
     case "Yesterday": return 2
     case "Past 7 Days": return 7
     case "Past 30 Days": return 30
+    case "All Time": return Number.MAX_SAFE_INTEGER
+    case "Custom": return Number.MAX_SAFE_INTEGER
     case "Daily": return 7
     case "Weekly": return 28
     case "Monthly": return 90

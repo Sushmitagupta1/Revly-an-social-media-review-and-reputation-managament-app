@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
 
@@ -32,11 +33,17 @@ def _build_location_resolver(db: Session) -> dict[str, str]:
     return {str(r.id): r.name for r in rows}
 
 
-def _resolve_location_ids(db: Session, location_names: list[str]) -> list[str]:
+def _resolve_location_ids(db: Session, location_names: list[str]) -> list:
     from app.models.location import Location
     rows = db.query(Location.id, Location.name).all()
-    name_to_id = {r.name: str(r.id) for r in rows}
+    name_to_id = {r.name: r.id for r in rows}
     return [name_to_id[n] for n in location_names if n in name_to_id]
+
+
+def _to_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 @router.get("", response_model=DashboardResponse)
@@ -49,80 +56,143 @@ def get_dashboard(
     now = datetime.now(timezone.utc)
     loc_resolver = _build_location_resolver(db)
 
-    base_query = db.query(Review)
+    filters = []
     if locations:
         filter_names = [n.strip() for n in locations.split(",") if n.strip()]
         if filter_names:
             loc_ids = _resolve_location_ids(db, filter_names)
             if loc_ids:
-                base_query = base_query.filter(Review.location_id.in_(loc_ids))
+                filters.append(Review.location_id.in_(loc_ids))
 
+    dt_from = None
+    dt_to = None
     if date_from:
         try:
             dt_from = datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-            base_query = base_query.filter(Review.created_at >= dt_from)
+            filters.append(Review.created_at >= dt_from)
         except ValueError:
             pass
     if date_to:
         try:
             dt_to = datetime.strptime(date_to, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
-            base_query = base_query.filter(Review.created_at < dt_to)
+            filters.append(Review.created_at < dt_to)
         except ValueError:
             pass
 
-    # ── KPIs ──
-    total = base_query.count()
-    avg_rating = base_query.with_entities(func.avg(Review.rating)).scalar() or 0
+    # Load every matching review once; all aggregations happen in Python.
+    query = db.query(Review)
+    for f in filters:
+        query = query.filter(f)
+    reviews = query.all()
 
-    replied = base_query.filter(Review.is_resolved == True).count()
-    response_rate = (replied / total * 100) if total > 0 else 0
-
-    avg_response_hours = 2.4  # Mock — would come from reply timestamps in production
+    total = len(reviews)
+    if total > 0:
+        avg_rating = round(sum(r.rating for r in reviews) / total, 1)
+    else:
+        avg_rating = 0
+    replied = sum(1 for r in reviews if r.is_resolved)
+    response_rate = round(replied / total * 100, 1) if total > 0 else 0
 
     kpis = KpiResponse(
         total_reviews=total,
-        average_rating=round(float(avg_rating), 1),
-        response_rate=round(response_rate, 1),
-        avg_response_hours=avg_response_hours,
+        average_rating=avg_rating,
+        response_rate=response_rate,
+        avg_response_hours=2.4,  # Mock — would come from reply timestamps in production
     )
 
-    # ── Sentiment trend (last 30 days) ──
-    sentiment_trend = []
-    for i in range(29, -1, -1):
-        day = (now - timedelta(days=i)).date()
-        day_start = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
-        day_end = day_start + timedelta(days=1)
-        day_count = base_query.filter(
-            Review.created_at >= day_start, Review.created_at < day_end
-        ).count()
-        day_avg = base_query.filter(
-            Review.created_at >= day_start, Review.created_at < day_end
-        ).with_entities(func.avg(Review.rating)).scalar() or 0
+    # ── Trend window ──
+    # Explicit range → align trend buckets to that range (daily up to 45 days, weekly beyond).
+    # No explicit range (e.g. "All Time") → cover the entire available history.
+    if dt_from is None and dt_to is None:
+        earliest = db.query(func.min(Review.created_at)).scalar()
+        trend_start = _to_utc(earliest) if earliest else now - timedelta(days=30)
+        trend_end = now
+        range_days = (trend_end - trend_start).days
+        granularity = "day" if range_days <= 45 else "week"
+    else:
+        trend_start = dt_from or (now - timedelta(days=30))
+        trend_end = dt_to or now
+        if trend_end > now:
+            trend_end = now
+        if trend_start >= trend_end:
+            trend_start = trend_end - timedelta(days=1)
+        range_days = (trend_end - trend_start).days
+        granularity = "day" if range_days <= 45 else "week"
+
+    sentiment_by_day: dict = defaultdict(lambda: [0, 0.0])  # [count, rating_sum]
+    complaints_by_day: dict = defaultdict(int)
+    praises_by_day: dict = defaultdict(int)
+    for r in reviews:
+        if r.created_at is None:
+            continue
+        ts = _to_utc(r.created_at)
+        if ts < trend_start or ts >= trend_end:
+            continue
+        if granularity == "week":
+            key = ts.date() - timedelta(days=ts.date().weekday())
+        else:
+            key = ts.date()
+        sentiment_by_day[key][0] += 1
+        sentiment_by_day[key][1] += r.rating
+        if r.sentiment == "negative":
+            complaints_by_day[key] += 1
+        elif r.sentiment == "positive":
+            praises_by_day[key] += 1
+
+    sentiment_trend: list[TrendPoint] = []
+    complaints_trend: list[TrendPoint] = []
+    praises_trend: list[TrendPoint] = []
+
+    def _append_bucket(day_key):
+        count, rating_sum = sentiment_by_day.get(day_key, [0, 0.0])
         sentiment_trend.append(TrendPoint(
-            date=day.isoformat(),
-            count=day_count,
-            avg_rating=round(float(day_avg), 1) if day_avg else 0,
+            date=day_key.isoformat(),
+            count=count,
+            avg_rating=round(rating_sum / count, 1) if count else 0,
         ))
+        complaints_trend.append(TrendPoint(date=day_key.isoformat(), count=complaints_by_day.get(day_key, 0), avg_rating=0))
+        praises_trend.append(TrendPoint(date=day_key.isoformat(), count=praises_by_day.get(day_key, 0), avg_rating=0))
+
+    if granularity == "day":
+        end_day = trend_end.date()
+        if trend_end.hour == 0 and trend_end.minute == 0 and trend_end.second == 0:
+            end_day = end_day - timedelta(days=1)
+        day = trend_start.date()
+        while day <= end_day:
+            _append_bucket(day)
+            day += timedelta(days=1)
+    else:
+        start_week = trend_start.date() - timedelta(days=trend_start.date().weekday())
+        end_week = trend_end.date() - timedelta(days=1)
+        end_week = end_week - timedelta(days=end_week.weekday())
+        week = start_week
+        while week <= end_week:
+            _append_bucket(week)
+            week += timedelta(days=7)
 
     # ── Rating distribution ──
-    rating_rows = base_query.with_entities(Review.rating, func.count(Review.id)).group_by(Review.rating).all()
-    rating_map = {r: c for r, c in rating_rows}
+    rating_map = defaultdict(int)
+    for r in reviews:
+        rating_map[r.rating] += 1
     rating_distribution = [
         RatingDistribution(rating=i, count=rating_map.get(i, 0)) for i in range(1, 6)
     ]
 
     # ── Platform breakdown ──
-    platform_rows = base_query.with_entities(
-        Review.platform, func.count(Review.id), func.avg(Review.rating)
-    ).group_by(Review.platform).all()
+    platform_map: dict = defaultdict(lambda: [0, 0.0])
+    for r in reviews:
+        platform_map[r.platform][0] += 1
+        platform_map[r.platform][1] += r.rating
     platform_breakdown = [
-        PlatformBreakdown(platform=p, count=c, avg_rating=round(float(a), 1))
-        for p, c, a in platform_rows
+        PlatformBreakdown(platform=p, count=c, avg_rating=round(s / c, 1))
+        for p, (c, s) in platform_map.items()
     ]
 
     # ── Sentiment breakdown ──
-    sentiment_rows = base_query.with_entities(Review.sentiment, func.count(Review.id)).group_by(Review.sentiment).all()
-    sentiment_map = {s: c for s, c in sentiment_rows if s}
+    sentiment_map = defaultdict(int)
+    for r in reviews:
+        if r.sentiment:
+            sentiment_map[r.sentiment] += 1
     sentiment_breakdown = SentimentBreakdown(
         positive=sentiment_map.get("positive", 0),
         negative=sentiment_map.get("negative", 0),
@@ -136,7 +206,11 @@ def get_dashboard(
     nps_score = round(((promoters - detractors) / nps_total * 100)) if nps_total > 0 else 0
 
     # ── Recent reviews (last 5) ──
-    recent = base_query.order_by(Review.created_at.desc()).limit(5).all()
+    recent = sorted(
+        reviews,
+        key=lambda r: _to_utc(r.created_at) if r.created_at else datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )[:5]
     recent_reviews = [
         RecentReview(
             id=str(r.id),
@@ -151,104 +225,92 @@ def get_dashboard(
     ]
 
     # ── Location summary ──
-    location_rows = base_query.with_entities(
-        Review.location_id, func.count(Review.id), func.avg(Review.rating)
-    ).group_by(Review.location_id).all()
-
-    locations = []
-    for loc_id, count, avg in location_rows:
-        loc_id_str = str(loc_id) if loc_id else "unknown"
-        locations.append(LocationSummary(
-            location_id=loc_id_str,
-            location_name=loc_resolver.get(loc_id_str, f"Location {loc_id_str[:8]}"),
+    loc_map: dict = defaultdict(lambda: [0, 0.0])
+    for r in reviews:
+        if r.location_id is None:
+            continue
+        lid = str(r.location_id)
+        loc_map[lid][0] += 1
+        loc_map[lid][1] += r.rating
+    locations_list = []
+    for lid, (count, rating_sum) in loc_map.items():
+        locations_list.append(LocationSummary(
+            location_id=lid,
+            location_name=loc_resolver.get(lid, f"Location {lid[:8]}"),
             review_count=count,
-            average_rating=round(float(avg), 1),
+            average_rating=round(rating_sum / count, 1),
         ))
-    locations.sort(key=lambda x: x.average_rating, reverse=True)
-    top_locations = locations[:3]
-    bottom_locations = locations[-3:] if len(locations) > 3 else []
+    locations_list.sort(key=lambda x: x.average_rating, reverse=True)
+    top_locations = locations_list[:3]
+    bottom_locations = locations_list[-3:] if len(locations_list) > 3 else []
 
-    # ── Complaints count and by location ──
-    complaints_count = base_query.filter(Review.sentiment == "negative").count()
-    complaints_location_rows = base_query.with_entities(
-        Review.location_id, func.count(Review.id)
-    ).filter(Review.sentiment == "negative").group_by(Review.location_id).all()
+    # ── Complaints/Praises by location ──
+    complaints_count = sentiment_map.get("negative", 0)
+    praises_count = sentiment_map.get("positive", 0)
+    complaint_loc_map = defaultdict(int)
+    praise_loc_map = defaultdict(int)
+    for r in reviews:
+        if r.location_id is None or not r.sentiment:
+            continue
+        lid = str(r.location_id)
+        if r.sentiment == "negative":
+            complaint_loc_map[lid] += 1
+        elif r.sentiment == "positive":
+            praise_loc_map[lid] += 1
+
     complaints_by_location = [
         ComplaintLocation(
-            location_id=str(loc_id) if loc_id else "unknown",
-            location_name=loc_resolver.get(str(loc_id) if loc_id else "unknown", f"Location {str(loc_id)[:8]}"),
-            count=count,
+            location_id=lid,
+            location_name=loc_resolver.get(lid, f"Location {lid[:8]}"),
+            count=c,
         )
-        for loc_id, count in complaints_location_rows
+        for lid, c in complaint_loc_map.items()
     ]
     complaints_by_location.sort(key=lambda x: x.count, reverse=True)
 
-    # ── Praises count and by location ──
-    praises_count = base_query.filter(Review.sentiment == "positive").count()
-    praises_location_rows = base_query.with_entities(
-        Review.location_id, func.count(Review.id)
-    ).filter(Review.sentiment == "positive").group_by(Review.location_id).all()
     praises_by_location = [
         PraiseLocation(
-            location_id=str(loc_id) if loc_id else "unknown",
-            location_name=loc_resolver.get(str(loc_id) if loc_id else "unknown", f"Location {str(loc_id)[:8]}"),
-            count=count,
+            location_id=lid,
+            location_name=loc_resolver.get(lid, f"Location {lid[:8]}"),
+            count=c,
         )
-        for loc_id, count in praises_location_rows
+        for lid, c in praise_loc_map.items()
     ]
     praises_by_location.sort(key=lambda x: x.count, reverse=True)
 
-    # ── Complaints/Praises trend (last 30 days) ──
-    complaints_trend = []
-    praises_trend = []
-    for i in range(29, -1, -1):
-        day = (now - timedelta(days=i)).date()
-        day_start = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
-        day_end = day_start + timedelta(days=1)
-        day_complaints = base_query.filter(
-            Review.sentiment == "negative",
-            Review.created_at >= day_start, Review.created_at < day_end,
-        ).count()
-        day_praises = base_query.filter(
-            Review.sentiment == "positive",
-            Review.created_at >= day_start, Review.created_at < day_end,
-        ).count()
-        complaints_trend.append(TrendPoint(date=day.isoformat(), count=day_complaints, avg_rating=0))
-        praises_trend.append(TrendPoint(date=day.isoformat(), count=day_praises, avg_rating=0))
-
-    # ── Complaint topics ──
-    complaint_query = base_query.filter(Review.sentiment == "negative")
+    # ── Complaint/Praise topics ──
     topic_counter_complaints: dict[str, int] = {}
-    for r in complaint_query.yield_per(500):
-        if r.topics:
-            raw = r.topics
-            if isinstance(raw, str):
-                try:
-                    raw = json.loads(raw)
-                except (json.JSONDecodeError, TypeError):
-                    raw = []
-            if isinstance(raw, list):
-                for t in raw:
-                    label = TOPIC_LABELS.get(t, t.replace("_", " ").title())
-                    topic_counter_complaints[label] = topic_counter_complaints.get(label, 0) + 1
-    complaint_topics = [{"topic": t, "count": c} for t, c in sorted(topic_counter_complaints.items(), key=lambda x: x[1], reverse=True)]
-
-    # ── Praise topics ──
-    praise_query = base_query.filter(Review.sentiment == "positive")
     topic_counter_praises: dict[str, int] = {}
-    for r in praise_query.yield_per(500):
-        if r.topics:
-            raw = r.topics
-            if isinstance(raw, str):
-                try:
-                    raw = json.loads(raw)
-                except (json.JSONDecodeError, TypeError):
-                    raw = []
-            if isinstance(raw, list):
-                for t in raw:
-                    label = TOPIC_LABELS.get(t, t.replace("_", " ").title())
-                    topic_counter_praises[label] = topic_counter_praises.get(label, 0) + 1
-    praise_topics = [{"topic": t, "count": c} for t, c in sorted(topic_counter_praises.items(), key=lambda x: x[1], reverse=True)]
+    for r in reviews:
+        if not r.topics or not r.sentiment:
+            continue
+        raw = r.topics
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                raw = []
+        if not isinstance(raw, list):
+            continue
+        target = None
+        if r.sentiment == "negative":
+            target = topic_counter_complaints
+        elif r.sentiment == "positive":
+            target = topic_counter_praises
+        if target is None:
+            continue
+        for t in raw:
+            label = TOPIC_LABELS.get(t, t.replace("_", " ").title())
+            target[label] = target.get(label, 0) + 1
+
+    complaint_topics = [
+        {"topic": t, "count": c}
+        for t, c in sorted(topic_counter_complaints.items(), key=lambda x: x[1], reverse=True)
+    ]
+    praise_topics = [
+        {"topic": t, "count": c}
+        for t, c in sorted(topic_counter_praises.items(), key=lambda x: x[1], reverse=True)
+    ]
 
     return DashboardResponse(
         kpis=kpis,
