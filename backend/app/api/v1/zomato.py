@@ -448,6 +448,8 @@ async def backfill_order_details():
     from app.services.zomato_sync import (
         _fetch_all_reviews,
         _fetch_order_details,
+        _fetch_restaurants,
+        _with_restaurant,
         refresh_zomato_session,
     )
 
@@ -462,6 +464,7 @@ async def backfill_order_details():
             raise HTTPException(status_code=400, detail="No connected Zomato integration found")
 
         refresh_zomato_session(integration)
+        restaurant_map = _fetch_restaurants(integration)
 
         with httpx.Client(timeout=60) as client:
             raw_reviews = _fetch_all_reviews(integration, client)
@@ -475,7 +478,7 @@ async def backfill_order_details():
                     {"title": df.get("title", ""), "rating": df.get("rating", "")}
                     for df in r.get("dish_feedbacks", []) or []
                 ]
-                order_map[pid] = (oid, dishes)
+                order_map[pid] = (oid, dishes, str(r.get("res_id", "")))
 
         reviews = db.query(Review).filter(Review.platform == "zomato").all()
 
@@ -491,26 +494,39 @@ async def backfill_order_details():
         errors = 0
         to_fetch = []
         for rev in reviews:
+            entry = order_map.get(rev.platform_review_id)
+            res_id = entry[2] if entry else None
+            restaurant = restaurant_map.get(res_id) if res_id else None
+
             if not rev.order_id:
-                entry = order_map.get(rev.platform_review_id)
                 if not entry:
                     skipped += 1
                     continue
                 rev.order_id = entry[0]
                 if not rev.order_details:
-                    rev.order_details = {"order_id": entry[0], "dishes": entry[1]}
-            if _is_full(rev.order_details):
-                skipped += 1
-                continue
-            to_fetch.append(rev)
+                    rev.order_details = _with_restaurant(
+                        {"order_id": entry[0], "dishes": entry[1]}, restaurant
+                    )
 
-        for rev in to_fetch:
+            needs_restaurant = bool(rev.order_details and not rev.order_details.get("restaurant"))
+            if not _is_full(rev.order_details) or (needs_restaurant and res_id):
+                to_fetch.append((rev, res_id))
+            else:
+                skipped += 1
+
+        for rev, res_id in to_fetch:
             details = _fetch_order_details(integration, rev.order_id)
+            restaurant = restaurant_map.get(res_id) if res_id else None
             if details:
-                rev.order_details = details
+                rid = details.get("res_id") or res_id
+                rev.order_details = _with_restaurant(
+                    details, restaurant_map.get(rid) or restaurant
+                )
                 updated += 1
             else:
                 errors += 1
+                if rev.order_details:
+                    rev.order_details = _with_restaurant(rev.order_details, restaurant)
         db.commit()
 
         return {

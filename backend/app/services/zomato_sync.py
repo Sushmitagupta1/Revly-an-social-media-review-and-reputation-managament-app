@@ -17,6 +17,7 @@ ZOMATO_API_BASE = "https://api.zomato.com/merchant-gw/web"
 SET_CSRF_URL = "https://api.zomato.com/merchant-gw/set-csrf"
 NPS_GET_URL = "https://www.zomato.com/merchant-api/nps/get"
 ORDER_DETAILS_URL = "https://www.zomato.com/merchant-api/orders/order-details"
+RESTAURANTS_URL = "https://www.zomato.com/merchant-api/restaurants/get-all"
 
 
 def _build_order_headers(integration: Integration) -> dict:
@@ -53,16 +54,69 @@ def _parse_order_details(data: dict) -> dict:
     total_amount = (total_block.get("amountDetails") or {}).get("totalCost")
     if total_amount is not None:
         total = total_amount
+    creator = order.get("creator") or {}
+    address = creator.get("address") or {}
     return {
         "order_id": str(order.get("id", "")),
+        "res_id": str(order.get("resId", "")) or None,
         "ordered_at": order.get("createdAt"),
         "state": order.get("state"),
         "delivery_mode": order.get("deliveryMode"),
         "payment_method": order.get("paymentMethod"),
-        "customer_name": (order.get("creator") or {}).get("name"),
+        "customer_name": creator.get("name"),
+        "customer_address": {
+            "address": address.get("address", ""),
+            "locality": address.get("locality", ""),
+        } if address else None,
         "dishes": dishes,
         "total": total,
     }
+
+
+def _with_restaurant(order_details: dict | None, restaurant: dict | None) -> dict | None:
+    """Attach restaurant/outlet info to stored order details."""
+    if not order_details:
+        return None
+    merged = dict(order_details)
+    if restaurant:
+        merged["restaurant"] = restaurant
+    return merged
+
+
+def _fetch_restaurants(integration: Integration) -> dict[str, dict]:
+    """Fetch outlet info (name, subzone, city, address) for the integration's restaurants."""
+    restaurant_ids = []
+    if integration.restaurant_ids:
+        try:
+            restaurant_ids = json.loads(integration.restaurant_ids)
+        except (json.JSONDecodeError, TypeError):
+            restaurant_ids = []
+    if not restaurant_ids:
+        return {}
+    try:
+        with httpx.Client(timeout=30) as client:
+            resp = client.get(
+                RESTAURANTS_URL,
+                headers=_build_order_headers(integration),
+                params={"res_id": ",".join(restaurant_ids)},
+            )
+            if resp.status_code != 200:
+                logger.warning(f"restaurants/get-all returned {resp.status_code}")
+                return {}
+            out = {}
+            for e in resp.json().get("entities", []) or []:
+                rid = str(e.get("id", ""))
+                if rid:
+                    out[rid] = {
+                        "name": e.get("name", ""),
+                        "subzone": e.get("subzone", ""),
+                        "city": e.get("city_name", ""),
+                        "address": e.get("address", ""),
+                    }
+            return out
+    except Exception as e:
+        logger.warning(f"restaurants/get-all error: {e}")
+        return {}
 
 
 def _fetch_order_details(integration: Integration, order_id: str) -> dict | None:
@@ -96,7 +150,7 @@ def _fetch_all_reviews(integration: Integration, client: httpx.Client) -> list[d
     all_reviews: list[dict] = []
     for res_id in restaurant_ids:
         offset = 0
-        for _ in range(5):
+        for _ in range(100):
             try:
                 resp = client.get(
                     f"{ZOMATO_API_BASE}/reviews/get/all",
@@ -110,6 +164,8 @@ def _fetch_all_reviews(integration: Integration, client: httpx.Client) -> list[d
                 reviews = data.get("reviews", [])
                 if not reviews:
                     break
+                for r in reviews:
+                    r["res_id"] = res_id
                 all_reviews.extend(reviews)
                 pagination = data.get("pagination", {})
                 if not pagination.get("has_more"):
@@ -338,6 +394,7 @@ def sync_zomato_reviews():
             logger.warning("Session refresh failed, proceeding with existing tokens")
 
         headers = _build_headers(integration)
+        restaurant_map = _fetch_restaurants(integration)
         new_count = 0
         updated_count = 0
 
@@ -345,7 +402,8 @@ def sync_zomato_reviews():
             for res_id in restaurant_ids:
                 offset = 0
                 pages = 0
-                max_pages = 5
+                max_pages = 50
+                restaurant = restaurant_map.get(res_id)
 
                 while pages < max_pages:
                     try:
@@ -390,16 +448,21 @@ def sync_zomato_reviews():
                                     updated_count += 1
                                 if order_id and not existing.order_id:
                                     existing.order_id = order_id
-                                    existing.order_details = {
+                                    existing.order_details = _with_restaurant({
                                         "order_id": order_id,
                                         "dishes": dish_feedbacks,
-                                    }
+                                    }, restaurant)
                                     updated_count += 1
                                 elif not existing.order_id and dish_feedbacks:
-                                    existing.order_details = {
+                                    existing.order_details = _with_restaurant({
                                         "order_id": order_id or "",
                                         "dishes": dish_feedbacks,
-                                    }
+                                    }, restaurant)
+                                    updated_count += 1
+                                elif existing.order_details and not existing.order_details.get("restaurant") and order_id:
+                                    existing.order_details = _with_restaurant(
+                                        dict(existing.order_details), restaurant
+                                    )
                                     updated_count += 1
                                 continue
 
@@ -421,12 +484,12 @@ def sync_zomato_reviews():
                             if order_id:
                                 order_details = _fetch_order_details(integration, order_id)
                                 if order_details:
-                                    review.order_details = order_details
+                                    review.order_details = _with_restaurant(order_details, restaurant)
                                 elif dish_feedbacks:
-                                    review.order_details = {
+                                    review.order_details = _with_restaurant({
                                         "order_id": order_id,
                                         "dishes": dish_feedbacks,
-                                    }
+                                    }, restaurant)
                             review_date = _parse_display_date(display_date)
                             if review_date:
                                 review.created_at = review_date

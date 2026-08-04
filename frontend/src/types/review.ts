@@ -2,8 +2,18 @@ export type OrderDish =
   | { name: string; quantity: number; unit_cost?: number; total_cost?: number }
   | { title: string; rating: string }
 
+export interface RestaurantInfo {
+  name: string
+  subzone: string
+  city: string
+  address: string
+}
+
 export interface OrderDetails {
   order_id: string
+  res_id?: string | null
+  restaurant?: RestaurantInfo | null
+  customer_address?: { address: string; locality: string } | null
   ordered_at: string | null
   state: string | null
   delivery_mode: string | null

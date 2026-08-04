@@ -1,4 +1,4 @@
-import { Package, Clock, IndianRupee, MapPin } from "lucide-react"
+import { Package, Clock, IndianRupee, MapPin, Store } from "lucide-react"
 import type { OrderDetails, OrderDish } from "@/types/review"
 
 interface Props {
@@ -43,6 +43,19 @@ export default function OrderDetails({ order }: Props) {
           </span>
         )}
       </div>
+
+      {order.restaurant?.name && (
+        <div className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-text">
+          <Store className="h-4 w-4 shrink-0 text-text-secondary" />
+          <span className="truncate">{order.restaurant.name}</span>
+          {order.restaurant.subzone && (
+            <span className="shrink-0 text-xs font-normal text-text-secondary">
+              · {order.restaurant.subzone}
+              {order.restaurant.city ? `, ${order.restaurant.city}` : ""}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-secondary">
         {order.ordered_at && (
