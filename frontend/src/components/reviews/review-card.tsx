@@ -1,4 +1,4 @@
-import { ExternalLink } from "lucide-react"
+import { ExternalLink, MessageSquare } from "lucide-react"
 import RatingBadge from "@/components/shared/rating-badge"
 import OrderDetails from "@/components/shared/order-details"
 import { timeAgo } from "@/lib/utils"
@@ -57,6 +57,11 @@ export default function ReviewCard({ review, onClick }: Props) {
               "bg-card-secondary text-text-secondary"
             }`}>
               {review.sentiment}
+            </span>
+          )}
+          {review.reply_count > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-info-bg px-2 py-0.5 text-xs font-medium text-info">
+              <MessageSquare className="h-3 w-3" /> Replied
             </span>
           )}
         </div>

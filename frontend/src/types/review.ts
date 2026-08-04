@@ -27,6 +27,7 @@ export interface Review {
   location_name: string | null
   order_id: string | null
   order_details: OrderDetails | null
+  reply_count: number
   created_at: string
 }
 

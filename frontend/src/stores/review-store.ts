@@ -23,6 +23,7 @@ interface ReviewState {
   setLocations: (locations: string[]) => void
   fetchReviews: () => Promise<void>
   fetchStats: () => Promise<void>
+  fetchReplies: (reviewId: string) => Promise<Reply[]>
   generateReply: (reviewId: string, tone?: string) => Promise<Reply>
   createReply: (reviewId: string, text: string) => Promise<Reply>
   approveReply: (replyId: string) => Promise<void>
@@ -79,6 +80,11 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     if (locations.length > 0) params.set("locations", locations.join(","))
     const { data } = await apiClient.get<ReviewStats>(`/reviews/stats?${params}`)
     set({ stats: data })
+  },
+
+  fetchReplies: async (reviewId) => {
+    const { data } = await apiClient.get<Reply[]>(`/reviews/${reviewId}/replies`)
+    return data
   },
 
   generateReply: async (reviewId, tone = "professional") => {

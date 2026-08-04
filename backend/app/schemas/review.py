@@ -18,6 +18,7 @@ class ReviewResponse(BaseModel):
     location_name: str | None = None
     order_id: str | None = None
     order_details: dict | None = None
+    reply_count: int = 0
     created_at: datetime
 
     class Config:

@@ -9,6 +9,7 @@ from sqlalchemy import func
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.csv_export import export_reviews_csv
+from app.models.reply import Reply
 from app.models.review import Review
 from app.schemas.review import ReviewListResponse, ReviewResolveRequest, ReviewResponse, ReviewStatsResponse
 
@@ -111,10 +112,12 @@ def list_reviews(
     reviews = query.order_by(Review.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
 
     loc_map = _build_location_name_map(db)
+    reply_counts = dict(db.query(Reply.review_id, func.count(Reply.id)).group_by(Reply.review_id).all())
     response_items = []
     for r in reviews:
         item = ReviewResponse.model_validate(r)
         item.location_name = loc_map.get(str(r.location_id)) if r.location_id else None
+        item.reply_count = reply_counts.get(r.id, 0)
         response_items.append(item)
 
     return ReviewListResponse(

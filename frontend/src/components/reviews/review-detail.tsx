@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { X, Sparkles, RefreshCw } from "lucide-react"
 import RatingBadge from "@/components/shared/rating-badge"
 import OrderDetails from "@/components/shared/order-details"
@@ -18,7 +18,15 @@ export default function ReviewDetail({ review, onClose }: Props) {
   const [aiReply, setAiReply] = useState<Reply | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [tone, setTone] = useState("professional")
-  const { generateReply, createReply, approveReply, sendReply, deleteReply } = useReviewStore()
+  const { fetchReplies, generateReply, createReply, approveReply, sendReply, deleteReply } = useReviewStore()
+
+  useEffect(() => {
+    let cancelled = false
+    fetchReplies(review.id).then((existing) => {
+      if (!cancelled) setReplies(existing)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [review.id, fetchReplies])
 
   const handleGenerate = async (tone?: string) => {
     setIsGenerating(true)

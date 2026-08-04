@@ -7,6 +7,7 @@ from sqlalchemy import func
 
 from app.api.deps import CurrentUser, DbSession
 from app.models.review import Review
+from app.models.reply import Reply
 from app.core.constants import TOPIC_LABELS
 from app.schemas.review import ComplaintListResponse, ReviewResponse, TopicCount
 
@@ -96,8 +97,15 @@ def list_complaints(
     pages = math.ceil(total / limit) if total > 0 else 1
     reviews = query.order_by(Review.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
 
+    reply_counts = dict(db.query(Reply.review_id, func.count(Reply.id)).group_by(Reply.review_id).all())
+    response_items = []
+    for r in reviews:
+        item = ReviewResponse.model_validate(r)
+        item.reply_count = reply_counts.get(r.id, 0)
+        response_items.append(item)
+
     return ComplaintListResponse(
-        reviews=[ReviewResponse.model_validate(r) for r in reviews],
+        reviews=response_items,
         total=total,
         page=page,
         pages=pages,

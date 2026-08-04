@@ -12,6 +12,21 @@ from app.schemas.reply import ReplyCreate, ReplyGenerate, ReplyResponse, ReplyUp
 router = APIRouter()
 
 
+@router.get("/reviews/{review_id}/replies", response_model=list[ReplyResponse])
+def list_replies(
+    review_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser,
+):
+    import uuid
+    review = db.query(Review).filter(Review.id == uuid.UUID(review_id)).first()
+    if not review:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
+
+    replies = db.query(Reply).filter(Reply.review_id == review.id).order_by(Reply.created_at).all()
+    return [ReplyResponse.model_validate(r) for r in replies]
+
+
 @router.post("/reviews/{review_id}/replies/generate", response_model=ReplyResponse)
 def generate_ai_reply(
     review_id: str,
