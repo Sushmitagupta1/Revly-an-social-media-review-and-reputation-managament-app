@@ -479,6 +479,13 @@ async def backfill_order_details():
 
         reviews = db.query(Review).filter(Review.platform == "zomato").all()
 
+        def _is_full(details: dict | None) -> bool:
+            return bool(details) and bool(
+                details.get("ordered_at")
+                or details.get("total") is not None
+                or details.get("state")
+            )
+
         updated = 0
         skipped = 0
         errors = 0
@@ -492,9 +499,7 @@ async def backfill_order_details():
                 rev.order_id = entry[0]
                 if not rev.order_details:
                     rev.order_details = {"order_id": entry[0], "dishes": entry[1]}
-                    updated += 1
-                continue
-            if rev.order_details:
+            if _is_full(rev.order_details):
                 skipped += 1
                 continue
             to_fetch.append(rev)
