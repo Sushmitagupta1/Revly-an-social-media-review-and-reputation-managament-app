@@ -16,6 +16,71 @@ logger = logging.getLogger("zomato_sync")
 ZOMATO_API_BASE = "https://api.zomato.com/merchant-gw/web"
 SET_CSRF_URL = "https://api.zomato.com/merchant-gw/set-csrf"
 NPS_GET_URL = "https://www.zomato.com/merchant-api/nps/get"
+ORDER_DETAILS_URL = "https://www.zomato.com/merchant-api/orders/order-details"
+
+
+def _build_order_headers(integration: Integration) -> dict:
+    """Headers for the www.zomato.com merchant-api endpoints (e.g. order-details)."""
+    return {
+        "accept": "application/json, text/plain, */*",
+        "x-client-id": "zomato_web_merchant",
+        "x-zomato-app-version": "2",
+        "x-zomato-csrft": integration.csrf_token or "",
+        "x-zomato-mx-csrf-token": integration.mx_csrf_token or "",
+        "x-zomato-source-identifier": "merchant-dashboard",
+        "x-zomato-trace-id": "web-revly-autosync",
+        "referer": "https://www.zomato.com/partners/onlineordering/reviews/",
+        "origin": "https://www.zomato.com",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+        "cookie": f"X-Zomato-Mx-Auth-Token={integration.auth_token}; {integration.cookies or ''}",
+    }
+
+
+def _parse_order_details(data: dict) -> dict:
+    """Extract a compact order summary from the order-details API response."""
+    order = data.get("order") or {}
+    cart = order.get("cartDetails") or {}
+    dishes = []
+    for d in (cart.get("items") or {}).get("dishes", []) or []:
+        dishes.append({
+            "name": d.get("name", ""),
+            "quantity": d.get("quantity", 1),
+            "unit_cost": d.get("unitCost"),
+            "total_cost": d.get("totalCost"),
+        })
+    total = None
+    total_block = cart.get("total") or {}
+    total_amount = (total_block.get("amountDetails") or {}).get("totalCost")
+    if total_amount is not None:
+        total = total_amount
+    return {
+        "order_id": str(order.get("id", "")),
+        "ordered_at": order.get("createdAt"),
+        "state": order.get("state"),
+        "delivery_mode": order.get("deliveryMode"),
+        "payment_method": order.get("paymentMethod"),
+        "customer_name": (order.get("creator") or {}).get("name"),
+        "dishes": dishes,
+        "total": total,
+    }
+
+
+def _fetch_order_details(integration: Integration, order_id: str) -> dict | None:
+    """Fetch compact order details for an order via the merchant-api endpoint."""
+    try:
+        with httpx.Client(timeout=30) as client:
+            resp = client.get(
+                ORDER_DETAILS_URL,
+                headers=_build_order_headers(integration),
+                params={"tab_id": order_id},
+            )
+            if resp.status_code != 200:
+                logger.warning(f"order-details for {order_id} returned {resp.status_code}")
+                return None
+            return _parse_order_details(resp.json())
+    except Exception as e:
+        logger.warning(f"order-details error for {order_id}: {e}")
+        return None
 
 
 def _parse_cookie_dict(raw: str) -> dict[str, str]:
@@ -264,6 +329,14 @@ def sync_zomato_reviews():
                             customer = r.get("customer_details", {})
                             info = r.get("review_info", {})
                             platform_review_id = str(r.get("review_id", ""))
+                            order_id = str(r.get("order_id", "")) or None
+
+                            dish_feedbacks = []
+                            for df in r.get("dish_feedbacks", []) or []:
+                                dish_feedbacks.append({
+                                    "title": df.get("title", ""),
+                                    "rating": df.get("rating", ""),
+                                })
 
                             existing = db.query(Review).filter(
                                 Review.platform == "zomato",
@@ -276,6 +349,19 @@ def sync_zomato_reviews():
                                     existing.sentiment = _classify_sentiment(
                                         existing.rating, existing.text
                                     )
+                                    updated_count += 1
+                                if order_id and not existing.order_id:
+                                    existing.order_id = order_id
+                                    existing.order_details = {
+                                        "order_id": order_id,
+                                        "dishes": dish_feedbacks,
+                                    }
+                                    updated_count += 1
+                                elif not existing.order_id and dish_feedbacks:
+                                    existing.order_details = {
+                                        "order_id": order_id or "",
+                                        "dishes": dish_feedbacks,
+                                    }
                                     updated_count += 1
                                 continue
 
@@ -292,7 +378,17 @@ def sync_zomato_reviews():
                                 text=text,
                                 sentiment=_classify_sentiment(rating, text),
                                 topics=_extract_topics(text),
+                                order_id=order_id,
                             )
+                            if order_id:
+                                order_details = _fetch_order_details(integration, order_id)
+                                if order_details:
+                                    review.order_details = order_details
+                                elif dish_feedbacks:
+                                    review.order_details = {
+                                        "order_id": order_id,
+                                        "dishes": dish_feedbacks,
+                                    }
                             review_date = _parse_display_date(display_date)
                             if review_date:
                                 review.created_at = review_date

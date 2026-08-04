@@ -22,3 +22,5 @@ class Review(Base, TimestampMixin):
     sentiment: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
     topics: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     is_resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+    order_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    order_details: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

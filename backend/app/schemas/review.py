@@ -16,6 +16,8 @@ class ReviewResponse(BaseModel):
     is_resolved: bool
     location_id: uuid.UUID | None
     location_name: str | None = None
+    order_id: str | None = None
+    order_details: dict | None = None
     created_at: datetime
 
     class Config:

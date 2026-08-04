@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { X, Sparkles, RefreshCw } from "lucide-react"
 import RatingBadge from "@/components/shared/rating-badge"
+import OrderDetails from "@/components/shared/order-details"
 import ReplyCard from "./reply-card"
 import ReplyEditor from "./reply-editor"
 import { useReviewStore } from "@/stores/review-store"
@@ -76,6 +77,12 @@ export default function ReviewDetail({ review, onClose }: Props) {
         {review.text && (
           <div className="rounded-xl bg-card-secondary p-4 mb-4">
             <p className="text-sm text-text leading-relaxed">{review.text}</p>
+          </div>
+        )}
+
+        {review.order_details && (
+          <div className="mb-4">
+            <OrderDetails order={review.order_details} />
           </div>
         )}
 

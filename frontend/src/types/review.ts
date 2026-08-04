@@ -1,3 +1,18 @@
+export type OrderDish =
+  | { name: string; quantity: number; unit_cost?: number; total_cost?: number }
+  | { title: string; rating: string }
+
+export interface OrderDetails {
+  order_id: string
+  ordered_at: string | null
+  state: string | null
+  delivery_mode: string | null
+  payment_method: string | null
+  customer_name: string | null
+  dishes: OrderDish[]
+  total: number | null
+}
+
 export interface Review {
   id: string
   platform: string
@@ -10,6 +25,8 @@ export interface Review {
   is_resolved: boolean
   location_id: string | null
   location_name: string | null
+  order_id: string | null
+  order_details: OrderDetails | null
   created_at: string
 }
 

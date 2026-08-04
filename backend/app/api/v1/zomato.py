@@ -247,6 +247,8 @@ async def fetch_zomato_reviews(body: ZomatoAuthRequest):
                 text=rev["text"],
                 sentiment=_classify_sentiment(rev["rating"], rev["text"]),
                 topics=_extract_topics(rev["text"]),
+                order_id=rev.get("order_id"),
+                order_details=rev.get("order_details"),
             )
             review_date = _parse_display_date(rev.get("display_date"))
             if review_date:
@@ -268,6 +270,13 @@ async def fetch_zomato_reviews(body: ZomatoAuthRequest):
 def _parse_review(r: dict, res_id: str) -> dict:
     customer = r.get("customer_details", {})
     info = r.get("review_info", {})
+    order_id = str(r.get("order_id", "")) or ""
+    dish_feedbacks = []
+    for df in r.get("dish_feedbacks", []) or []:
+        dish_feedbacks.append({
+            "title": df.get("title", ""),
+            "rating": df.get("rating", ""),
+        })
     return {
         "platform_review_id": str(r.get("review_id", "")),
         "reviewer_name": customer.get("name", "Anonymous"),
@@ -278,6 +287,11 @@ def _parse_review(r: dict, res_id: str) -> dict:
         "display_date": info.get("display_date", ""),
         "reply_count": info.get("reply_count", 0),
         "res_id": res_id,
+        "order_id": order_id or None,
+        "order_details": {
+            "order_id": order_id,
+            "dishes": dish_feedbacks,
+        } if order_id else None,
     }
 
 
@@ -425,6 +439,58 @@ async def manual_sync():
     from app.services.zomato_sync import sync_zomato_reviews
     sync_zomato_reviews()
     return {"success": True, "message": "Sync completed"}
+
+
+@router.post("/backfill-orders")
+async def backfill_order_details():
+    """Fetch order details for existing Zomato reviews that have an order_id."""
+    from app.models.integration import Integration
+    from app.services.zomato_sync import _fetch_order_details
+
+    db = SessionLocal()
+    try:
+        integration = db.query(Integration).filter(
+            Integration.brand_id == MOCK_BRAND_ID,
+            Integration.platform == "zomato",
+            Integration.is_connected == True,
+        ).first()
+        if not integration or not integration.auth_token:
+            raise HTTPException(status_code=400, detail="No connected Zomato integration found")
+
+        reviews = (
+            db.query(Review)
+            .filter(
+                Review.platform == "zomato",
+                Review.order_id.isnot(None),
+                Review.order_id != "",
+            )
+            .all()
+        )
+
+        updated = 0
+        skipped = 0
+        errors = 0
+        for rev in reviews:
+            if rev.order_details:
+                skipped += 1
+                continue
+            details = _fetch_order_details(integration, rev.order_id)
+            if details:
+                rev.order_details = details
+                updated += 1
+            else:
+                errors += 1
+        db.commit()
+
+        return {
+            "success": True,
+            "total": len(reviews),
+            "updated": updated,
+            "skipped": skipped,
+            "errors": errors,
+        }
+    finally:
+        db.close()
 
 
 @router.post("/refresh-session")

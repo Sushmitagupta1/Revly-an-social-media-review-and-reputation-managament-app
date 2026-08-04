@@ -17,7 +17,7 @@ logger = logging.getLogger("zomato_sync")
 
 
 def _run_migrations(engine):
-    """Add missing columns for integrations table."""
+    """Add missing columns for integrations and reviews tables."""
     import sqlalchemy as sa
     from sqlalchemy import inspect
     try:
@@ -33,6 +33,23 @@ def _run_migrations(engine):
             logger.info("Migration complete")
     except Exception as e:
         logger.warning(f"Migration check failed (table may not exist yet): {e}")
+
+    try:
+        inspector = inspect(engine)
+        columns = [c["name"] for c in inspector.get_columns("reviews")]
+        missing = [c for c in ["order_id", "order_details"] if c not in columns]
+        if missing:
+            logger.info(f"Adding missing columns to reviews table: {missing}")
+            with engine.connect() as conn:
+                for col in missing:
+                    if col == "order_details":
+                        conn.execute(sa.text("ALTER TABLE reviews ADD COLUMN order_details JSONB"))
+                    else:
+                        conn.execute(sa.text(f"ALTER TABLE reviews ADD COLUMN {col} VARCHAR(64)"))
+                conn.commit()
+            logger.info("Reviews migration complete")
+    except Exception as e:
+        logger.warning(f"Reviews migration check failed (table may not exist yet): {e}")
 
 app = FastAPI(title="Revly API", version="0.1.0")
 

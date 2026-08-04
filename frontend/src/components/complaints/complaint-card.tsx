@@ -1,5 +1,6 @@
 import { CheckCircle, AlertTriangle } from "lucide-react"
 import RatingBadge from "@/components/shared/rating-badge"
+import OrderDetails from "@/components/shared/order-details"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { timeAgo } from "@/lib/utils"
@@ -39,6 +40,12 @@ export default function ComplaintCard({ review, onResolve }: Props) {
 
       {review.text && (
         <p className="mt-3 text-sm leading-relaxed text-text line-clamp-3">{review.text}</p>
+      )}
+
+      {review.order_details && (
+        <div className="mt-3">
+          <OrderDetails order={review.order_details} />
+        </div>
       )}
 
       <div className="mt-3 flex items-center justify-between">

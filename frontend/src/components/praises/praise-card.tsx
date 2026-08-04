@@ -1,5 +1,6 @@
 import { Star } from "lucide-react"
 import RatingBadge from "@/components/shared/rating-badge"
+import OrderDetails from "@/components/shared/order-details"
 import { timeAgo } from "@/lib/utils"
 import type { Review } from "@/types/review"
 
@@ -27,6 +28,12 @@ export default function PraiseCard({ review }: Props) {
 
       {review.text && (
         <p className="mt-3 text-sm leading-relaxed text-text line-clamp-3">{review.text}</p>
+      )}
+
+      {review.order_details && (
+        <div className="mt-3">
+          <OrderDetails order={review.order_details} />
+        </div>
       )}
 
       <div className="mt-3 flex gap-1">

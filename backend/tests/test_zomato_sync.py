@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.core.constants import MOCK_BRAND_ID
 from app.models.integration import Integration
-from app.services.zomato_sync import _parse_display_date
+from app.services.zomato_sync import _parse_display_date, _parse_order_details
 
 
 def _fake_jwt(rrm: dict) -> str:
@@ -47,6 +47,81 @@ def test_restaurant_ids_from_jwt():
     assert sorted(_restaurant_ids_from_jwt(token)) == ["110076", "20590610", "21137764"]
     assert _restaurant_ids_from_jwt("not-a-jwt") == []
     assert _restaurant_ids_from_jwt("") == []
+
+
+def test_parse_order_details():
+    data = {
+        "status": 200,
+        "order": {
+            "id": "8430300139",
+            "resId": "110076",
+            "state": "DELIVERED",
+            "deliveryMode": "DELIVERY",
+            "paymentMethod": "PAID",
+            "createdAt": "2026-08-03T08:15:57Z",
+            "creator": {"name": "Arup", "orderCount": 1},
+            "cartDetails": {
+                "items": {
+                    "dishes": [
+                        {"name": "Chicken Pot Pourri (275 gms)", "quantity": 1, "unitCost": 495, "totalCost": 495},
+                        {"name": "Baked Macaroni with Chicken [275 g]", "quantity": 1, "unitCost": 490, "totalCost": 490},
+                    ]
+                },
+                "total": {"amountDetails": {"totalCost": 985}},
+            },
+        },
+    }
+    parsed = _parse_order_details(data)
+    assert parsed["order_id"] == "8430300139"
+    assert parsed["ordered_at"] == "2026-08-03T08:15:57Z"
+    assert parsed["state"] == "DELIVERED"
+    assert parsed["delivery_mode"] == "DELIVERY"
+    assert parsed["payment_method"] == "PAID"
+    assert parsed["customer_name"] == "Arup"
+    assert parsed["total"] == 985
+    assert len(parsed["dishes"]) == 2
+    assert parsed["dishes"][0]["name"] == "Chicken Pot Pourri (275 gms)"
+    assert parsed["dishes"][0]["quantity"] == 1
+
+
+def test_parse_order_details_missing_blocks():
+    parsed = _parse_order_details({})
+    assert parsed["order_id"] == ""
+    assert parsed["ordered_at"] is None
+    assert parsed["total"] is None
+    assert parsed["dishes"] == []
+
+
+def test_parse_review_includes_order():
+    from app.api.v1.zomato import _parse_review
+    review = {
+        "review_id": 492835756,
+        "customer_details": {"name": "Arup", "image": {"url": "https://example.com/a.jpg"}, "orders_count": 1},
+        "review_info": {"rating": 5, "display_date": "yesterday"},
+        "dish_feedbacks": [
+            {"title": "Chicken Pot Pourri (275 gms)", "rating": "5"},
+            {"title": "Baked Macaroni with Chicken [275 g]", "rating": "5"},
+        ],
+        "order_id": 8430300139,
+    }
+    parsed = _parse_review(review, "110076")
+    assert parsed["order_id"] == "8430300139"
+    assert parsed["order_details"] is not None
+    assert parsed["order_details"]["order_id"] == "8430300139"
+    assert len(parsed["order_details"]["dishes"]) == 2
+    assert parsed["order_details"]["dishes"][0]["title"] == "Chicken Pot Pourri (275 gms)"
+
+
+def test_parse_review_without_order():
+    from app.api.v1.zomato import _parse_review
+    review = {
+        "review_id": 1,
+        "customer_details": {"name": "X"},
+        "review_info": {"rating": 4},
+    }
+    parsed = _parse_review(review, "110076")
+    assert parsed["order_id"] is None
+    assert parsed["order_details"] is None
 
 
 def test_update_restaurants_endpoint(client, db_session):
