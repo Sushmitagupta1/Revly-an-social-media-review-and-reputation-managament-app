@@ -443,9 +443,13 @@ async def manual_sync():
 
 @router.post("/backfill-orders")
 async def backfill_order_details():
-    """Fetch order details for existing Zomato reviews that have an order_id."""
+    """Populate order_id for existing reviews from the reviews API, then fetch full order details."""
     from app.models.integration import Integration
-    from app.services.zomato_sync import _fetch_order_details
+    from app.services.zomato_sync import (
+        _fetch_all_reviews,
+        _fetch_order_details,
+        refresh_zomato_session,
+    )
 
     db = SessionLocal()
     try:
@@ -457,23 +461,45 @@ async def backfill_order_details():
         if not integration or not integration.auth_token:
             raise HTTPException(status_code=400, detail="No connected Zomato integration found")
 
-        reviews = (
-            db.query(Review)
-            .filter(
-                Review.platform == "zomato",
-                Review.order_id.isnot(None),
-                Review.order_id != "",
-            )
-            .all()
-        )
+        refresh_zomato_session(integration)
+
+        with httpx.Client(timeout=60) as client:
+            raw_reviews = _fetch_all_reviews(integration, client)
+
+        order_map = {}
+        for r in raw_reviews:
+            pid = str(r.get("review_id", ""))
+            oid = str(r.get("order_id", "")) or None
+            if pid and oid:
+                dishes = [
+                    {"title": df.get("title", ""), "rating": df.get("rating", "")}
+                    for df in r.get("dish_feedbacks", []) or []
+                ]
+                order_map[pid] = (oid, dishes)
+
+        reviews = db.query(Review).filter(Review.platform == "zomato").all()
 
         updated = 0
         skipped = 0
         errors = 0
+        to_fetch = []
         for rev in reviews:
+            if not rev.order_id:
+                entry = order_map.get(rev.platform_review_id)
+                if not entry:
+                    skipped += 1
+                    continue
+                rev.order_id = entry[0]
+                if not rev.order_details:
+                    rev.order_details = {"order_id": entry[0], "dishes": entry[1]}
+                    updated += 1
+                continue
             if rev.order_details:
                 skipped += 1
                 continue
+            to_fetch.append(rev)
+
+        for rev in to_fetch:
             details = _fetch_order_details(integration, rev.order_id)
             if details:
                 rev.order_details = details
@@ -484,7 +510,8 @@ async def backfill_order_details():
 
         return {
             "success": True,
-            "total": len(reviews),
+            "review_count": len(reviews),
+            "matched_orders": len(order_map),
             "updated": updated,
             "skipped": skipped,
             "errors": errors,

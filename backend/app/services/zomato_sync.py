@@ -83,6 +83,44 @@ def _fetch_order_details(integration: Integration, order_id: str) -> dict | None
         return None
 
 
+def _fetch_all_reviews(integration: Integration, client: httpx.Client) -> list[dict]:
+    """Fetch all review pages across the merchant's restaurants (raw review dicts)."""
+    restaurant_ids = []
+    if integration.restaurant_ids:
+        try:
+            restaurant_ids = json.loads(integration.restaurant_ids)
+        except (json.JSONDecodeError, TypeError):
+            restaurant_ids = []
+
+    headers = _build_headers(integration)
+    all_reviews: list[dict] = []
+    for res_id in restaurant_ids:
+        offset = 0
+        for _ in range(5):
+            try:
+                resp = client.get(
+                    f"{ZOMATO_API_BASE}/reviews/get/all",
+                    headers=headers,
+                    params={"res_id": res_id, "offset": offset},
+                )
+                if resp.status_code != 200:
+                    logger.warning(f"Zomato API returned {resp.status_code} for restaurant {res_id}")
+                    break
+                data = resp.json()
+                reviews = data.get("reviews", [])
+                if not reviews:
+                    break
+                all_reviews.extend(reviews)
+                pagination = data.get("pagination", {})
+                if not pagination.get("has_more"):
+                    break
+                offset = pagination.get("next_start", offset + len(reviews))
+            except Exception as e:
+                logger.warning(f"Error fetching reviews for restaurant {res_id}: {e}")
+                break
+    return all_reviews
+
+
 def _parse_cookie_dict(raw: str) -> dict[str, str]:
     """Parse a semi-colon separated Cookie string into a dict."""
     result = {}
