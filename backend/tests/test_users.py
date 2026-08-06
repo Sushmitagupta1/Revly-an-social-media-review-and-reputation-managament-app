@@ -3,9 +3,10 @@ def get_auth_header(client):
         "email": "me@test.com",
         "password": "password123",
         "full_name": "Me User",
+        "username": "meuser",
     })
     login = client.post("/api/v1/auth/login", json={
-        "email": "me@test.com",
+        "username": "meuser",
         "password": "password123",
     })
     token = login.json()["access_token"]
@@ -17,6 +18,7 @@ def test_get_me(client):
     response = client.get("/api/v1/users/me", headers=headers)
     assert response.status_code == 200
     assert response.json()["email"] == "me@test.com"
+    assert response.json()["username"] == "meuser"
 
 
 def test_get_me_unauthorized(client):

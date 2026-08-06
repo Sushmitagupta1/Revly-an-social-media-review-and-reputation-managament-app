@@ -51,6 +51,20 @@ def _run_migrations(engine):
     except Exception as e:
         logger.warning(f"Reviews migration check failed (table may not exist yet): {e}")
 
+    try:
+        inspector = inspect(engine)
+        columns = [c["name"] for c in inspector.get_columns("users")]
+        missing = [c for c in ["username"] if c not in columns]
+        if missing:
+            logger.info(f"Adding missing columns to users table: {missing}")
+            with engine.connect() as conn:
+                for col in missing:
+                    conn.execute(sa.text(f"ALTER TABLE users ADD COLUMN {col} VARCHAR(255)"))
+                conn.commit()
+            logger.info("Users migration complete")
+    except Exception as e:
+        logger.warning(f"Users migration check failed (table may not exist yet): {e}")
+
 app = FastAPI(title="Revly API", version="0.1.0")
 
 scheduler = BackgroundScheduler()

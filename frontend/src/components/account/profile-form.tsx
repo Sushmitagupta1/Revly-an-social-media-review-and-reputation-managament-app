@@ -6,6 +6,7 @@ import apiClient from "@/lib/api-client"
 
 export default function ProfileForm() {
   const { user, fetchUser } = useAuthStore()
+  const [username, setUsername] = useState(user?.username || "")
   const [fullName, setFullName] = useState(user?.full_name || "")
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || "")
   const [saving, setSaving] = useState(false)
@@ -15,13 +16,17 @@ export default function ProfileForm() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    await apiClient.patch("/users/me", { full_name: fullName, avatar_url: avatarUrl || null })
+    await apiClient.patch("/users/me", { username: username || null, full_name: fullName, avatar_url: avatarUrl || null })
     await fetchUser()
     setSaving(false)
   }
 
   return (
     <form onSubmit={handleSave} className="max-w-lg space-y-4">
+      <div>
+        <label className="mb-1 block text-sm font-medium text-text">Username</label>
+        <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Your login username" autoCapitalize="none" autoCorrect="off" />
+      </div>
       <div>
         <label className="mb-1 block text-sm font-medium text-text">Email</label>
         <Input value={user.email} disabled className="opacity-60" />
