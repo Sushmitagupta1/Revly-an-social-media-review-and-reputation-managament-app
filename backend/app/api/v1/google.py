@@ -103,7 +103,7 @@ async def fetch_google_locations(req: TokenRequest):
         if accounts_resp.status_code == 429:
             return {"locations": [], "error": "Google API rate limited. Please wait a minute and try again."}
         if accounts_resp.status_code != 200:
-            return {"locations": [], "error": f"Google API error: {accounts_resp.status_code}"}
+            return {"locations": [], "error": f"Google API error: {accounts_resp.status_code}: {accounts_resp.text[:300]}"}
 
         accounts = accounts_resp.json().get("accounts", [])
         if not accounts:
@@ -125,7 +125,10 @@ async def fetch_google_locations(req: TokenRequest):
                 break
 
             if loc_resp.status_code != 200:
-                continue
+                return {
+                    "locations": [],
+                    "error": f"Google API error: {loc_resp.status_code}: {loc_resp.text[:300]}",
+                }
             for loc in loc_resp.json().get("locations", []):
                 addr = loc.get("storefrontAddress", {})
                 locations.append({
