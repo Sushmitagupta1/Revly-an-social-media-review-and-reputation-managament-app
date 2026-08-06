@@ -4,7 +4,7 @@ import { useAuthStore } from "@/stores/auth-store"
 import { LogIn } from "lucide-react"
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -16,7 +16,7 @@ export default function LoginPage() {
     setError("")
     setLoading(true)
     try {
-      await login(username, password)
+      await login(email, password)
       navigate("/overview")
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: string } } }
@@ -44,14 +44,12 @@ export default function LoginPage() {
           )}
 
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-text">Username</label>
+            <label className="mb-1.5 block text-[13px] font-medium text-text">Email</label>
             <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
-              autoCapitalize="none"
-              autoCorrect="off"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
               required
               className="w-full rounded-[14px] border border-border bg-card-secondary px-4 py-3 text-[14px] text-text placeholder-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent transition-colors"
             />

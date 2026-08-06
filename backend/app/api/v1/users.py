@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser, get_db
@@ -14,7 +14,6 @@ def get_me(user: CurrentUser):
     return UserResponse(
         id=user.id,
         email=user.email,
-        username=user.username,
         full_name=user.full_name,
         avatar_url=user.avatar_url,
         role_name=user.role.name if user.role else None,
@@ -24,12 +23,6 @@ def get_me(user: CurrentUser):
 
 @router.patch("/me", response_model=UserResponse)
 def update_me(body: UserUpdate, user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
-    if body.username is not None:
-        existing = db.query(User).filter(User.username == body.username).first()
-        if existing and existing.id != user.id:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=409, detail="Username already taken")
-        user.username = body.username
     if body.full_name is not None:
         user.full_name = body.full_name
     if body.avatar_url is not None:
@@ -39,9 +32,23 @@ def update_me(body: UserUpdate, user: CurrentUser, db: Annotated[Session, Depend
     return UserResponse(
         id=user.id,
         email=user.email,
-        username=user.username,
         full_name=user.full_name,
         avatar_url=user.avatar_url,
         role_name=user.role.name if user.role else None,
         created_at=user.created_at,
     )
+
+
+@router.delete("/by-email/{email}")
+def delete_user_by_email(email: str, user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
+    """Temporary helper: delete a user account by email."""
+    from app.models.user import User
+
+    if email.lower() == user.email.lower():
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    target = db.query(User).filter(User.email == email.lower()).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(target)
+    db.commit()
+    return {"success": True, "deleted_email": email}

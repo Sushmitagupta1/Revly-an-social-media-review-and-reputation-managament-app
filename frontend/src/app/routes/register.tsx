@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input"
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState("")
-  const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
@@ -19,7 +18,7 @@ export default function RegisterPage() {
     setError("")
     setLoading(true)
     try {
-      await register(email, password, fullName, username || undefined)
+      await register(email, password, fullName)
       navigate("/overview")
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: string } } }
@@ -47,17 +46,6 @@ export default function RegisterPage() {
             onChange={(e) => setFullName(e.target.value)}
             placeholder="John Doe"
             required
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-text">Username</label>
-          <Input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="johndoe"
-            autoCapitalize="none"
-            autoCorrect="off"
           />
         </div>
         <div>

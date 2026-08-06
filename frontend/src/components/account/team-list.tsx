@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge"
 interface TeamMember {
   id: string
   email: string
-  username: string | null
   full_name: string
   role_name: string | null
   is_active: boolean
@@ -30,7 +29,7 @@ export default function TeamList() {
             </div>
             <div>
               <p className="text-sm font-medium text-text">{m.full_name}</p>
-              <p className="text-xs text-text-secondary">{m.username || m.email}</p>
+              <p className="text-xs text-text-secondary">{m.email}</p>
             </div>
           </div>
           <Badge variant={m.is_active ? "success" : "secondary"}>{m.role_name || "Member"}</Badge>

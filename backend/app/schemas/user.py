@@ -7,7 +7,6 @@ from pydantic import BaseModel
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: str
-    username: str | None = None
     full_name: str
     avatar_url: str | None
     role_name: str | None
@@ -18,6 +17,5 @@ class UserResponse(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    username: str | None = None
     full_name: str | None = None
     avatar_url: str | None = None

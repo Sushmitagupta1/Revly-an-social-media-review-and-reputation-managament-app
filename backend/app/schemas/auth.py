@@ -5,11 +5,10 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
     full_name: str
-    username: str | None = None
 
 
 class LoginRequest(BaseModel):
-    username: str
+    email: EmailStr
     password: str
 
 
@@ -21,13 +20,3 @@ class TokenResponse(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
-
-
-class TeamUserItem(BaseModel):
-    username: str
-    password: str
-    full_name: str = ""
-
-
-class SetupTeamRequest(BaseModel):
-    users: list[TeamUserItem]

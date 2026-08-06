@@ -13,7 +13,6 @@ def seed_admin():
         if not existing:
             user = User(
                 email="admin@uppercrust.com",
-                username="admin",
                 full_name="Admin",
                 password_hash=hash_password("password123"),
                 is_active=True,
@@ -22,9 +21,6 @@ def seed_admin():
             db.commit()
             print("Seeded admin user: admin@uppercrust.com / password123")
         else:
-            if not existing.username:
-                existing.username = "admin"
-                db.commit()
             print("Admin user already exists, skipping seed.")
     finally:
         db.close()
