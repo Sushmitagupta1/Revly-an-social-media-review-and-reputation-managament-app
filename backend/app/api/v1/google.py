@@ -89,14 +89,14 @@ async def fetch_google_locations(req: TokenRequest):
     headers = {"Authorization": f"Bearer {access_token}"}
 
     async with httpx.AsyncClient(timeout=15) as client:
-        for attempt in range(3):
+        for attempt in range(6):
             accounts_resp = await client.get(
                 "https://mybusinessbusinessinformation.googleapis.com/v1/accounts",
                 headers=headers,
             )
             if accounts_resp.status_code == 429:
                 import asyncio
-                await asyncio.sleep(2 * (attempt + 1))
+                await asyncio.sleep(min(2 * (2 ** attempt), 30))
                 continue
             break
 
@@ -112,7 +112,7 @@ async def fetch_google_locations(req: TokenRequest):
         locations = []
         for account in accounts:
             account_id = account.get("name", "").split("/")[-1]
-            for attempt in range(3):
+            for attempt in range(6):
                 loc_resp = await client.get(
                     f"https://mybusinessbusinessinformation.googleapis.com/v1/accounts/{account_id}/locations",
                     headers=headers,
@@ -120,7 +120,7 @@ async def fetch_google_locations(req: TokenRequest):
                 )
                 if loc_resp.status_code == 429:
                     import asyncio
-                    await asyncio.sleep(2 * (attempt + 1))
+                    await asyncio.sleep(min(2 * (2 ** attempt), 30))
                     continue
                 break
 
