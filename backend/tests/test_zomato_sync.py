@@ -49,6 +49,33 @@ def test_restaurant_ids_from_jwt():
     assert _restaurant_ids_from_jwt("") == []
 
 
+def test_match_location_id():
+    from app.api.v1.zomato import _match_location_id
+    locations = [
+        ("loc-1", "Upper Crust (Vastrapur)"),
+        ("loc-2", "Upper Crust Bakery (Prahlad Nagar)"),
+        ("loc-3", "Lithosphere By Upper Crust (Bodakdev)"),
+    ]
+    assert _match_location_id(
+        {"restaurant": {"name": "Upper Crust", "subzone": "Vastrapur"}}, locations
+    ) == "loc-1"
+    # name fallback without subzone
+    assert _match_location_id(
+        {"restaurant": {"name": "Upper Crust (Vastrapur)"}}, locations
+    ) == "loc-1"
+    # city fallback
+    assert _match_location_id(
+        {"restaurant": {"name": "Upper Crust", "city": "Vastrapur"}}, locations
+    ) == "loc-1"
+    # unmatched
+    assert _match_location_id(
+        {"restaurant": {"name": "Some Other Restaurant", "subzone": "X"}}, locations
+    ) is None
+    # no restaurant info
+    assert _match_location_id(None, locations) is None
+    assert _match_location_id({}, locations) is None
+
+
 def test_parse_order_details():
     data = {
         "status": 200,

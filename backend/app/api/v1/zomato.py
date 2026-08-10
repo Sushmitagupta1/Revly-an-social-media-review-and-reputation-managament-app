@@ -541,6 +541,79 @@ async def backfill_order_details():
         db.close()
 
 
+@router.post("/backfill-locations")
+async def backfill_locations():
+    """Assign location_id to Zomato reviews missing it, via restaurant info in order_details."""
+    import uuid as uuid_mod
+    from app.models.location import Location
+
+    db = SessionLocal()
+    try:
+        locations = [
+            (str(loc.id), loc.name)
+            for loc in db.query(Location).filter(Location.brand_id == MOCK_BRAND_ID).all()
+        ]
+        reviews = db.query(Review).filter(
+            Review.platform == "zomato",
+            Review.location_id.is_(None),
+        ).all()
+
+        matched = 0
+        unmatched_names = set()
+        for rev in reviews:
+            lid = _match_location_id(rev.order_details, locations)
+            if lid:
+                rev.location_id = uuid_mod.UUID(lid)
+                matched += 1
+            else:
+                restaurant = (rev.order_details or {}).get("restaurant") or {}
+                name = restaurant.get("name") or ""
+                if name:
+                    unmatched_names.add(f"{name} ({restaurant.get('subzone', '')})".replace(" ()", ""))
+        db.commit()
+        return {
+            "success": True,
+            "total_missing": len(reviews),
+            "matched": matched,
+            "unmatched": len(reviews) - matched,
+            "unmatched_locations": sorted(unmatched_names)[:50],
+        }
+    finally:
+        db.close()
+
+
+def _match_location_id(order_details: dict | None, locations: list[tuple[str, str]]) -> str | None:
+    """Return the id of the Location matching the restaurant inside order_details, else None.
+
+    locations: list of (location_id, location_name).
+    Candidates tried, in order: "Name (Subzone)", "Name", "Name (City)".
+    """
+    restaurant = (order_details or {}).get("restaurant") or {}
+    name = (restaurant.get("name") or "").strip()
+    subzone = (restaurant.get("subzone") or "").strip()
+    city = (restaurant.get("city") or "").strip()
+
+    candidates = []
+    if name and subzone:
+        candidates.append(f"{name} ({subzone})")
+    if name:
+        candidates.append(name)
+    if name and city:
+        candidates.append(f"{name} ({city})")
+    if not candidates:
+        return None
+
+    def _norm(s: str) -> str:
+        return " ".join(s.lower().split())
+
+    norm_map = {_norm(loc_name): loc_id for loc_id, loc_name in locations}
+    for cand in candidates:
+        lid = norm_map.get(_norm(cand))
+        if lid:
+            return lid
+    return None
+
+
 @router.post("/refresh-session")
 async def refresh_zomato_session():
     import traceback
