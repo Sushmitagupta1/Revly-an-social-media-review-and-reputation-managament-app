@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from app.api.deps import DbSession
@@ -435,10 +435,10 @@ async def fix_review_dates():
 
 
 @router.post("/sync")
-async def manual_sync():
+async def manual_sync(background_tasks: BackgroundTasks):
     from app.services.zomato_sync import sync_zomato_reviews
-    sync_zomato_reviews()
-    return {"success": True, "message": "Sync completed"}
+    background_tasks.add_task(sync_zomato_reviews)
+    return {"success": True, "message": "Sync started"}
 
 
 @router.post("/backfill-orders")
