@@ -11,6 +11,7 @@ router = APIRouter()
 
 class TokenRequest(BaseModel):
     access_token: str
+    search_term: str = ""
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -87,56 +88,41 @@ async def fetch_google_locations(req: TokenRequest):
         raise HTTPException(status_code=400, detail="Missing access token")
 
     headers = {"Authorization": f"Bearer {access_token}"}
+    search_term = (req.search_term or "").strip() or "Upper Crust"
 
-    async with httpx.AsyncClient(timeout=15) as client:
-        for attempt in range(4):
-            accounts_resp = await client.get(
-                "https://mybusinessaccountmanagement.googleapis.com/v1/accounts",
-                headers=headers,
+    async with httpx.AsyncClient(timeout=20) as client:
+        try:
+            search_resp = await client.post(
+                "https://mybusinessbusinessinformation.googleapis.com/v1/locations:search",
+                headers={**headers, "Content-Type": "application/json"},
+                json={
+                    "location": {"locationName": search_term},
+                    "resultCount": 20,
+                },
             )
-            if accounts_resp.status_code == 429:
-                import asyncio
-                await asyncio.sleep(min(2 ** attempt, 8))
-                continue
-            break
+        except httpx.HTTPError as e:
+            return {"locations": [], "error": f"Google API error: {e}"}
 
-        if accounts_resp.status_code == 429:
-            return {"locations": [], "error": f"Google API rate limited. {accounts_resp.text[:300]}"}
-        if accounts_resp.status_code != 200:
-            return {"locations": [], "error": f"Google API error: {accounts_resp.status_code}: {accounts_resp.text[:300]}"}
+        if search_resp.status_code == 429:
+            return {"locations": [], "error": f"Google API rate limited. {search_resp.text[:300]}"}
+        if search_resp.status_code != 200:
+            return {"locations": [], "error": f"Google API error: {search_resp.status_code}: {search_resp.text[:300]}"}
 
-        accounts = accounts_resp.json().get("accounts", [])
-        if not accounts:
-            return {"locations": [], "error": "No Google Business accounts found. Make sure you have a Google Business Profile at business.google.com"}
-
+        body = search_resp.json()
         locations = []
-        for account in accounts:
-            account_id = account.get("name", "").split("/")[-1]
-            for attempt in range(4):
-                loc_resp = await client.get(
-                    f"https://mybusinessbusinessinformation.googleapis.com/v1/accounts/{account_id}/locations",
-                    headers=headers,
-                    params={"readMask": "name,title,storefrontAddress,metadata"},
-                )
-                if loc_resp.status_code == 429:
-                    import asyncio
-                    await asyncio.sleep(min(2 ** attempt, 8))
-                    continue
-                break
-
-            if loc_resp.status_code != 200:
-                return {
-                    "locations": [],
-                    "error": f"Google API error: {loc_resp.status_code}: {loc_resp.text[:300]}",
-                }
-            for loc in loc_resp.json().get("locations", []):
-                addr = loc.get("storefrontAddress", {})
-                locations.append({
-                    "id": loc.get("name", ""),
-                    "name": loc.get("title", "Unknown"),
-                    "address": f"{addr.get('addressLines', [''])[0]}, {addr.get('locality', '')}",
-                    "state": addr.get("administrativeArea", ""),
-                })
+        for item in body.get("matchingLocations", []) or []:
+            loc = item.get("location", {})
+            name = loc.get("name", "")
+            if not name:
+                continue
+            addr = loc.get("storefrontAddress", {})
+            loc_id = name.split("/")[-1]
+            locations.append({
+                "id": loc_id,
+                "name": loc.get("title", "Unknown"),
+                "address": f"{addr.get('addressLines', [''])[0]}, {addr.get('locality', '')}",
+                "state": addr.get("administrativeArea", ""),
+            })
         return {"locations": locations}
 
 
