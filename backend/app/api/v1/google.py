@@ -91,7 +91,7 @@ async def fetch_google_locations(req: TokenRequest):
     async with httpx.AsyncClient(timeout=15) as client:
         for attempt in range(4):
             accounts_resp = await client.get(
-                "https://mybusinessbusinessinformation.googleapis.com/v1/accounts",
+                "https://mybusinessaccountmanagement.googleapis.com/v1/accounts",
                 headers=headers,
             )
             if accounts_resp.status_code == 429:
@@ -101,7 +101,7 @@ async def fetch_google_locations(req: TokenRequest):
             break
 
         if accounts_resp.status_code == 429:
-            return {"locations": [], "error": "Google API rate limited. Please wait a minute and try again."}
+            return {"locations": [], "error": f"Google API rate limited. {accounts_resp.text[:300]}"}
         if accounts_resp.status_code != 200:
             return {"locations": [], "error": f"Google API error: {accounts_resp.status_code}: {accounts_resp.text[:300]}"}
 
