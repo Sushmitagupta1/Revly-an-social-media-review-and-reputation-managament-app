@@ -45,9 +45,36 @@ def _apply_location_filter(query, db: DbSession, locations: str | None):
 def get_review_stats(
     db: DbSession,
     locations: str | None = None,
+    search: str | None = None,
+    platform: str | None = None,
+    rating: int | None = None,
+    sentiment: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
 ):
     query = db.query(Review)
     query = _apply_location_filter(query, db, locations)
+
+    if search:
+        query = query.filter(Review.text.ilike(f"%{search}%"))
+    if platform:
+        query = query.filter(Review.platform == platform)
+    if rating is not None:
+        query = query.filter(Review.rating == rating)
+    if sentiment:
+        query = query.filter(Review.sentiment == sentiment)
+    if date_from:
+        try:
+            dt = datetime.fromisoformat(date_from)
+            query = query.filter(Review.created_at >= dt)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            dt = datetime.fromisoformat(date_to)
+            query = query.filter(Review.created_at <= dt)
+        except ValueError:
+            pass
 
     total = query.with_entities(func.count(Review.id)).scalar() or 0
     avg = query.with_entities(func.avg(Review.rating)).scalar() or 0

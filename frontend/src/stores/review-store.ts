@@ -44,6 +44,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   setFilters: (filters) => {
     set((s) => ({ filters: { ...s.filters, ...filters }, page: 1 }))
     get().fetchReviews()
+    get().fetchStats()
   },
 
   setPage: (page) => {
@@ -54,6 +55,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   setLocations: (locations) => {
     set({ locations })
     get().fetchReviews()
+    get().fetchStats()
   },
 
   fetchReviews: async () => {
@@ -75,8 +77,14 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   },
 
   fetchStats: async () => {
-    const { locations } = get()
+    const { filters, locations } = get()
     const params = new URLSearchParams()
+    if (filters.search) params.set("search", filters.search)
+    if (filters.platform) params.set("platform", filters.platform)
+    if (filters.rating) params.set("rating", String(filters.rating))
+    if (filters.sentiment) params.set("sentiment", filters.sentiment)
+    if (filters.date_from) params.set("date_from", filters.date_from)
+    if (filters.date_to) params.set("date_to", filters.date_to)
     if (locations.length > 0) params.set("locations", locations.join(","))
     const { data } = await apiClient.get<ReviewStats>(`/reviews/stats?${params}`)
     set({ stats: data })
