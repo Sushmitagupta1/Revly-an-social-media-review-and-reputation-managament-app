@@ -57,3 +57,62 @@ def test_leaderboard(client, db_session):
     # Check review counts (3 reviews per location from seed)
     for loc in data["locations"]:
         assert loc["review_count"] == 3
+
+
+def test_leaderboard_time_and_location_filters(client, db_session):
+    user = _seed(db_session)
+    from app.models.location import Location
+    from datetime import datetime
+
+    loc_a = Location(id=uuid.uuid4(), brand_id=BRAND_ID, name="Upper Crust Bakery Bopal")
+    loc_b = Location(id=uuid.uuid4(), brand_id=BRAND_ID, name="Upper Crust Bakery Satellite")
+    db_session.add_all([loc_a, loc_b])
+    db_session.commit()
+
+    for i in range(3):
+        db_session.add(Review(
+            brand_id=BRAND_ID, location_id=loc_a.id, platform="google",
+            reviewer_name=f"A{i}", rating=5, text=f"A{i}",
+            sentiment="positive",
+            created_at=datetime(2026, 8, 1, 10, 0, 0),
+        ))
+    for i in range(3):
+        db_session.add(Review(
+            brand_id=BRAND_ID, location_id=loc_b.id, platform="google",
+            reviewer_name=f"B{i}", rating=2, text=f"B{i}",
+            sentiment="negative",
+            created_at=datetime(2026, 8, 10, 10, 0, 0),
+        ))
+    db_session.commit()
+
+    # Time filter: only the first batch (Aug 1) falls in this window
+    resp = client.get(
+        "/api/v1/leaderboard",
+        params={"date_from": "2026-08-01", "date_to": "2026-08-05"},
+        headers=_auth(user),
+    )
+    assert resp.status_code == 200
+    rows = resp.json()["locations"]
+    assert len(rows) == 1
+    assert rows[0]["location_name"] == "Upper Crust Bakery Bopal"
+    assert rows[0]["review_count"] == 3
+
+    # Location filter: only Satellite by name
+    resp = client.get(
+        "/api/v1/leaderboard",
+        params={"locations": "Upper Crust Bakery Satellite"},
+        headers=_auth(user),
+    )
+    assert resp.status_code == 200
+    rows = resp.json()["locations"]
+    assert len(rows) == 1
+    assert rows[0]["location_name"] == "Upper Crust Bakery Satellite"
+
+    # Empty window -> no locations
+    resp = client.get(
+        "/api/v1/leaderboard",
+        params={"date_from": "2027-01-01", "date_to": "2027-01-02"},
+        headers=_auth(user),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["locations"] == []

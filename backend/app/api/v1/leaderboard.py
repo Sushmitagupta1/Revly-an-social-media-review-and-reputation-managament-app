@@ -1,14 +1,36 @@
+from datetime import datetime, timedelta
+
 from app.api.deps import DbSession, CurrentUser
 from app.models.review import Review
 from app.models.location import Location
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from sqlalchemy import func
 
 router = APIRouter()
 
 
 @router.get("")
-def get_leaderboard(db: DbSession, _user: CurrentUser):
+def get_leaderboard(
+    db: DbSession,
+    _user: CurrentUser,
+    date_from: str | None = Query(None, description="Start date (YYYY-MM-DD)"),
+    date_to: str | None = Query(None, description="End date (YYYY-MM-DD)"),
+    locations: str | None = Query(None, description="Comma-separated location names to filter by"),
+):
+    loc_name_filter = locations
+    filters = [Review.location_id.isnot(None)]
+
+    if date_from:
+        try:
+            filters.append(Review.created_at >= datetime.strptime(date_from, "%Y-%m-%d"))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            filters.append(Review.created_at < datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1))
+        except ValueError:
+            pass
+
     loc_rows = db.query(Location.id, Location.name).all()
     loc_names = {str(r.id): r.name for r in loc_rows}
 
@@ -18,7 +40,7 @@ def get_leaderboard(db: DbSession, _user: CurrentUser):
             Review.sentiment,
             func.count(Review.id).label("cnt"),
         )
-        .filter(Review.location_id.isnot(None))
+        .filter(*filters)
         .group_by(Review.location_id, Review.sentiment)
         .all()
     )
@@ -37,7 +59,7 @@ def get_leaderboard(db: DbSession, _user: CurrentUser):
             func.avg(Review.rating).label("avg_rating"),
             func.count(Review.id).label("review_count"),
         )
-        .filter(Review.location_id.isnot(None))
+        .filter(*filters)
         .group_by(Review.location_id)
         .all()
     )
@@ -56,6 +78,11 @@ def get_leaderboard(db: DbSession, _user: CurrentUser):
             "sentiment_breakdown": sentiment,
             "positive_percentage": positive_pct,
         })
+
+    if loc_name_filter:
+        filter_names = {n.strip() for n in loc_name_filter.split(",") if n.strip()}
+        if filter_names:
+            locations = [loc for loc in locations if loc["location_name"] in filter_names]
 
     locations.sort(key=lambda x: (-x["avg_rating"], -x["review_count"]))
     for i, loc in enumerate(locations):

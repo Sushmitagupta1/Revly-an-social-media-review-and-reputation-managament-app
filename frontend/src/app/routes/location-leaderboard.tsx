@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { useLeaderboardStore } from "@/stores/leaderboard-store"
+import { useFilterStore } from "@/stores/filter-store"
 import LoadingSpinner from "@/components/shared/loading-spinner"
 import EmptyState from "@/components/shared/empty-state"
 import { Trophy, TrendingUp, TrendingDown } from "lucide-react"
@@ -7,18 +8,55 @@ import { cn } from "@/lib/utils"
 
 const sortOptions = ["Top Performing", "Most Improved"] as const
 
+function getResolvedRange(preset: string, custom: { from: string | null; to: string | null }): { from: string | null; to: string | null } {
+  if (custom.from || custom.to) return custom
+  const now = new Date()
+  const toStr = now.toISOString().split("T")[0]
+  switch (preset) {
+    case "Today": {
+      const s = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      return { from: s.toISOString().split("T")[0], to: toStr }
+    }
+    case "Yesterday": {
+      const s = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+      const e = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      return { from: s.toISOString().split("T")[0], to: e.toISOString().split("T")[0] }
+    }
+    case "Past 7 Days": {
+      const s = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      return { from: s.toISOString().split("T")[0], to: toStr }
+    }
+    case "Past 30 Days": {
+      const s = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      return { from: s.toISOString().split("T")[0], to: toStr }
+    }
+    default:
+      return { from: null, to: null }
+  }
+}
+
 export default function LocationLeaderboardPage() {
   const { locations, isLoading, fetchLeaderboard } = useLeaderboardStore()
+  const datePreset = useFilterStore((s) => s.datePreset)
+  const dateRange = useFilterStore((s) => s.dateRange)
+  const selectedLocations = useFilterStore((s) => s.selectedLocations)
   const [sortBy, setSortBy] = useState<"Top Performing" | "Most Improved">("Top Performing")
 
-  useEffect(() => { fetchLeaderboard() }, [])
+  useEffect(() => {
+    const resolved = getResolvedRange(datePreset, dateRange)
+    fetchLeaderboard({
+      date_from: resolved.from || undefined,
+      date_to: resolved.to || undefined,
+      locations: selectedLocations.length > 0 ? selectedLocations : undefined,
+    })
+  }, [datePreset, dateRange, selectedLocations])
 
   if (isLoading) {
     return <div className="flex h-64 items-center justify-center"><LoadingSpinner /></div>
   }
 
   if (locations.length === 0) {
-    return <EmptyState title="No location data" description="Reviews need location IDs to appear here." />
+    return <EmptyState title="No location data" description="No reviews match the selected filters." />
   }
 
   const sorted = [...locations].sort((a, b) =>
