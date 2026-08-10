@@ -41,7 +41,7 @@ interface FilterState {
   setPlatforms: (platforms: string[]) => void
 }
 
-const defaultPreset = "Past 7 Days"
+const defaultPreset = "All Time"
 
 export const useFilterStore = create<FilterState>((set) => ({
   selectedBrand: "Upper Crust",
