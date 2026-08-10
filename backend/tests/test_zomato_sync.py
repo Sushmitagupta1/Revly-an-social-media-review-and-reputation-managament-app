@@ -50,7 +50,7 @@ def test_restaurant_ids_from_jwt():
 
 
 def test_match_location_id():
-    from app.api.v1.zomato import _match_location_id
+    from app.services.zomato_sync import _match_location_id
     locations = [
         ("loc-1", "Upper Crust (Vastrapur)"),
         ("loc-2", "Upper Crust Bakery (Prahlad Nagar)"),

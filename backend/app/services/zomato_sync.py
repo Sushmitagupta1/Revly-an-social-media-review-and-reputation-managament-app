@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -348,6 +349,38 @@ def _extract_topics(text: str | None) -> list[str]:
     return topics
 
 
+def _match_location_id(order_details: dict | None, locations: list[tuple[str, str]]) -> str | None:
+    """Return the id of the Location matching the restaurant inside order_details, else None.
+
+    locations: list of (location_id, location_name).
+    Candidates tried, in order: "Name (Subzone)", "Name", "Name (City)".
+    """
+    restaurant = (order_details or {}).get("restaurant") or {}
+    name = (restaurant.get("name") or "").strip()
+    subzone = (restaurant.get("subzone") or "").strip()
+    city = (restaurant.get("city") or "").strip()
+
+    candidates = []
+    if name and subzone:
+        candidates.append(f"{name} ({subzone})")
+    if name:
+        candidates.append(name)
+    if name and city:
+        candidates.append(f"{name} ({city})")
+    if not candidates:
+        return None
+
+    def _norm(s: str) -> str:
+        return " ".join(s.lower().split())
+
+    norm_map = {_norm(loc_name): loc_id for loc_id, loc_name in locations}
+    for cand in candidates:
+        lid = norm_map.get(_norm(cand))
+        if lid:
+            return lid
+    return None
+
+
 def _resolve_location_ids(db, restaurant_ids: list[str]) -> dict[str, str]:
     from app.models.location import Location
     rows = db.query(Location.id, Location.name).all()
@@ -392,6 +425,12 @@ def sync_zomato_reviews():
         refreshed = refresh_zomato_session(integration)
         if not refreshed:
             logger.warning("Session refresh failed, proceeding with existing tokens")
+
+        from app.models.location import Location
+        loc_pairs = [
+            (str(loc.id), loc.name)
+            for loc in db.query(Location).filter(Location.brand_id == MOCK_BRAND_ID).all()
+        ]
 
         headers = _build_headers(integration)
         restaurant_map = _fetch_restaurants(integration)
@@ -490,6 +529,10 @@ def sync_zomato_reviews():
                                         "order_id": order_id,
                                         "dishes": dish_feedbacks,
                                     }, restaurant)
+                            if not review.location_id:
+                                lid = _match_location_id(review.order_details, loc_pairs)
+                                if lid:
+                                    review.location_id = uuid.UUID(lid)
                             review_date = _parse_display_date(display_date)
                             if review_date:
                                 review.created_at = review_date
