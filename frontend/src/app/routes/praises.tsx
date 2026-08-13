@@ -14,7 +14,6 @@ const PLATFORMS = [
   { label: "Google", value: "google" },
   { label: "Zomato", value: "zomato" },
   { label: "Swiggy", value: "swiggy" },
-  { label: "Reelo", value: "reelo" },
 ]
 
 export default function PraisesPage() {

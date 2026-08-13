@@ -6,7 +6,6 @@ const PLATFORMS = [
   { id: "google", label: "Google My Business", icon: "G" },
   { id: "zomato", label: "Zomato", icon: "Z" },
   { id: "swiggy", label: "Swiggy", icon: "S" },
-  { id: "reelo", label: "Reelo", icon: "R" },
 ]
 
 interface Props {
