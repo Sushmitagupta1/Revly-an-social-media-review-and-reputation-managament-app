@@ -7,6 +7,7 @@ const platforms = [
   { value: null, label: "All Platforms" },
   { value: "google", label: "Google" },
   { value: "zomato", label: "Zomato" },
+  { value: "swiggy", label: "Swiggy" },
   { value: "reelo", label: "Reelo" },
 ]
 

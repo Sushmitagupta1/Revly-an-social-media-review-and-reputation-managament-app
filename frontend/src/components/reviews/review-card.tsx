@@ -7,6 +7,7 @@ import type { Review } from "@/types/review"
 const platformColors: Record<string, string> = {
   google: "bg-blue-500",
   zomato: "bg-red-500",
+  swiggy: "bg-orange-500",
   reelo: "bg-purple-500",
 }
 
