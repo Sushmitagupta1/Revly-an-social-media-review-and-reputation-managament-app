@@ -53,7 +53,12 @@ def _run_migrations(engine):
         # overlapping runs (manual sync vs 15-min scheduler).
         unique_constraints = inspector.get_unique_constraints("reviews")
         existing = {tuple(uc.get("column_names") or []) for uc in unique_constraints}
-        if ("platform", "platform_review_id") not in existing:
+        unique_indexes = {
+            tuple(idx.get("column_names") or [])
+            for idx in inspector.get_indexes("reviews")
+            if idx.get("unique")
+        }
+        if ("platform", "platform_review_id") not in existing and ("platform", "platform_review_id") not in unique_indexes:
             logger.info("Deduping reviews and adding unique(platform, platform_review_id)")
             with engine.connect() as conn:
                 conn.execute(sa.text(
@@ -69,11 +74,11 @@ def _run_migrations(engine):
                     """
                 ))
                 conn.execute(sa.text(
-                    "ALTER TABLE reviews ADD CONSTRAINT uq_reviews_platform_review "
-                    "UNIQUE (platform, platform_review_id)"
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_reviews_platform_review "
+                    "ON reviews (platform, platform_review_id)"
                 ))
                 conn.commit()
-            logger.info("Reviews unique constraint added")
+            logger.info("Reviews unique index added")
     except Exception as e:
         logger.warning(f"Reviews migration check failed (table may not exist yet): {e}")
 

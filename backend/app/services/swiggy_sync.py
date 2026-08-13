@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 
 import httpx
 
+from sqlalchemy import text
+
 from app.core.constants import MOCK_BRAND_ID
 from app.core.database import SessionLocal, engine
 from app.models.integration import Integration
@@ -236,6 +238,47 @@ def _restaurant_by_id(restaurants: list[dict], rest_id) -> dict | None:
     return None
 
 
+def _ensure_unique_index(db) -> None:
+    """Dedup reviews and ensure unique(platform, platform_review_id) exists.
+
+    Self-healing: if the startup migration failed (or this DB predates it),
+    the ON CONFLICT upsert below requires the unique index. Idempotent.
+    """
+    try:
+        from sqlalchemy import inspect as sa_inspect
+        inspector = sa_inspect(db.bind)
+        unique_constraints = inspector.get_unique_constraints("reviews")
+        existing = {tuple(uc.get("column_names") or []) for uc in unique_constraints}
+        unique_indexes = {
+            tuple(idx.get("column_names") or [])
+            for idx in inspector.get_indexes("reviews")
+            if idx.get("unique")
+        }
+        if ("platform", "platform_review_id") in existing or ("platform", "platform_review_id") in unique_indexes:
+            return
+        logger.info("Swiggy sync: deduping reviews and ensuring unique index")
+        db.execute(text(
+            """
+            DELETE FROM reviews
+            WHERE platform_review_id IS NOT NULL
+              AND id NOT IN (
+                SELECT MIN(id)
+                FROM reviews
+                WHERE platform_review_id IS NOT NULL
+                GROUP BY platform, platform_review_id
+              )
+            """
+        ))
+        db.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_reviews_platform_review "
+            "ON reviews (platform, platform_review_id)"
+        ))
+        db.commit()
+        logger.info("Swiggy sync: unique index ensured")
+    except Exception as e:
+        logger.warning(f"Swiggy sync: unique index check failed: {e}")
+
+
 def sync_swiggy_reviews():
     """Fetch new reviews from Swiggy for all connected integrations."""
     db = SessionLocal()
@@ -252,6 +295,8 @@ def sync_swiggy_reviews():
         if not integration.auth_token:
             logger.warning("Swiggy integration has no access token, skipping sync")
             return
+
+        _ensure_unique_index(db)
 
         token = integration.auth_token
 
