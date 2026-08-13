@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils"
 import { useIntegrationStore } from "@/stores/integration-store"
 import apiClient from "@/lib/api-client"
 import ZomatoConnectModal from "./zomato-connect-modal"
+import SwiggyConnectModal from "./swiggy-connect-modal"
 
 interface Props {
   platform: string
@@ -31,6 +32,10 @@ interface Location {
 export default function ConnectModal({ platform, onClose }: Props) {
   if (platform === "zomato") {
     return <ZomatoConnectModal onClose={onClose} />
+  }
+
+  if (platform === "swiggy") {
+    return <SwiggyConnectModal onClose={onClose} />
   }
 
   const [step, setStep] = useState<Step>("auth")

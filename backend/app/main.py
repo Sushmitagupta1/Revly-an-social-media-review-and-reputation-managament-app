@@ -69,8 +69,13 @@ def on_startup():
         sync_zomato_reviews, "interval", minutes=15, id="zomato_sync",
         next_run_time=datetime.now(),
     )
+    from app.services.swiggy_sync import sync_swiggy_reviews
+    scheduler.add_job(
+        sync_swiggy_reviews, "interval", minutes=15, id="swiggy_sync",
+    )
     scheduler.start()
     logger.info("Zomato auto-sync scheduler started (every 15 minutes, first run immediately)")
+    logger.info("Swiggy auto-sync scheduler started (every 15 minutes)")
 
 
 @app.on_event("shutdown")

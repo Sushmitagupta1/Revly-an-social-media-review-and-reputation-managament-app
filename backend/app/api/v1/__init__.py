@@ -22,6 +22,7 @@ from app.api.v1.resolve import router as resolve_router
 from app.api.v1.google import router as google_router
 from app.api.v1.platforms import router as platforms_router
 from app.api.v1.zomato import router as zomato_router
+from app.api.v1.swiggy import router as swiggy_router
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(auth_router, prefix="/auth", tags=["auth"])
@@ -46,3 +47,4 @@ router.include_router(resolve_router, prefix="/resolve", tags=["resolve"])
 router.include_router(google_router, prefix="/google", tags=["google"])
 router.include_router(platforms_router, prefix="/platforms", tags=["platforms"])
 router.include_router(zomato_router, prefix="/zomato", tags=["zomato"])
+router.include_router(swiggy_router, prefix="/swiggy", tags=["swiggy"])
