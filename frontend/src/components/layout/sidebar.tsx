@@ -3,11 +3,12 @@ import { cn } from "@/lib/utils"
 import { useFilterStore } from "@/stores/filter-store"
 import DateFilter from "@/components/layout/date-filter"
 import LocationFilter from "@/components/layout/location-filter"
-import { Building2, LayoutDashboard, MapPin, Star, Settings } from "lucide-react"
+import { Building2, LayoutDashboard, MapPin, Star, Settings, Store } from "lucide-react"
 
 const navLinks = [
   { to: "/overview", label: "Dashboard", icon: LayoutDashboard },
   { to: "/location-leaderboard", label: "Location Leaderboard", icon: MapPin },
+  { to: "/account/locations", label: "Locations", icon: Store },
   { to: "/reviews", label: "Reviews", icon: Star },
   { to: "/account", label: "Account", icon: Settings },
 ]
