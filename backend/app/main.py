@@ -48,6 +48,32 @@ def _run_migrations(engine):
                         conn.execute(sa.text(f"ALTER TABLE reviews ADD COLUMN {col} VARCHAR(64)"))
                 conn.commit()
             logger.info("Reviews migration complete")
+
+        # Dedup reviews + add unique constraint to make syncs idempotent across
+        # overlapping runs (manual sync vs 15-min scheduler).
+        unique_constraints = inspector.get_unique_constraints("reviews")
+        existing = {tuple(uc.get("column_names") or []) for uc in unique_constraints}
+        if ("platform", "platform_review_id") not in existing:
+            logger.info("Deduping reviews and adding unique(platform, platform_review_id)")
+            with engine.connect() as conn:
+                conn.execute(sa.text(
+                    """
+                    DELETE FROM reviews
+                    WHERE platform_review_id IS NOT NULL
+                      AND id NOT IN (
+                        SELECT MIN(id)
+                        FROM reviews
+                        WHERE platform_review_id IS NOT NULL
+                        GROUP BY platform, platform_review_id
+                      )
+                    """
+                ))
+                conn.execute(sa.text(
+                    "ALTER TABLE reviews ADD CONSTRAINT uq_reviews_platform_review "
+                    "UNIQUE (platform, platform_review_id)"
+                ))
+                conn.commit()
+            logger.info("Reviews unique constraint added")
     except Exception as e:
         logger.warning(f"Reviews migration check failed (table may not exist yet): {e}")
 

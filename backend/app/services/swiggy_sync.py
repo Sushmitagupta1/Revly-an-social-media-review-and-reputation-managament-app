@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import httpx
 
 from app.core.constants import MOCK_BRAND_ID
-from app.core.database import SessionLocal
+from app.core.database import SessionLocal, engine
 from app.models.integration import Integration
 from app.models.review import Review
 
@@ -351,56 +351,13 @@ def sync_swiggy_reviews():
                     "is_repeat": customer.get("type") == "RTR",
                 }
 
-                if existing:
-                    changed = False
-                    if existing.rating != rating:
-                        existing.rating = rating
-                        existing.sentiment = _classify_sentiment(rating, text)
-                        changed = True
-                    if text != existing.text:
-                        existing.text = text
-                        existing.sentiment = _classify_sentiment(rating, text)
-                        existing.topics = _extract_topics(text)
-                        changed = True
-                    if order_time and existing.created_at != order_time:
-                        existing.created_at = order_time
-                        changed = True
-                    if changed:
-                        updated_count += 1
-                    continue
-
-                review = Review(
-                    brand_id=MOCK_BRAND_ID,
-                    platform="swiggy",
-                    platform_review_id=order_id,
-                    reviewer_name=customer.get("name", "Anonymous"),
-                    rating=rating,
-                    text=text,
-                    sentiment=_classify_sentiment(rating, text),
-                    topics=_extract_topics(text),
-                    order_id=order_id,
-                    order_details={
-                        "order_id": order_id,
-                        "restaurant": {
-                            "id": str(o.get("restaurantID", "")),
-                            "name": (restaurant or {}).get("rest_name", ""),
-                            "locality": (restaurant or {}).get("locality", ""),
-                            "city": (restaurant or {}).get("city_name", ""),
-                        },
-                        "rating_state": o.get("ratingState"),
-                        "items": items_payload,
-                        "customer": customer_payload,
-                    },
-                )
-                if order_time:
-                    review.created_at = order_time
-
                 # Fetch bill details per order (best effort).
+                bill_payload = None
                 try:
                     details = fetch_order_details(token, order_id, str(o.get("restaurantID", "")))
                     if details:
                         bill = details.get("billDetails") or {}
-                        review.order_details["bill"] = {
+                        bill_payload = {
                             "item_total": bill.get("itemTotal"),
                             "bill_total": bill.get("billTotal"),
                             "discount": bill.get("discount"),
@@ -411,14 +368,103 @@ def sync_swiggy_reviews():
                 time.sleep(0.4)
 
                 lid = _match_location_id(restaurant or {}, loc_pairs)
+                location_id = None
                 if lid:
                     try:
-                        review.location_id = uuid.UUID(lid)
+                        location_id = uuid.UUID(lid)
                     except (ValueError, AttributeError):
                         pass
 
-                db.add(review)
-                new_count += 1
+                order_details = {
+                    "order_id": order_id,
+                    "restaurant": {
+                        "id": str(o.get("restaurantID", "")),
+                        "name": (restaurant or {}).get("rest_name", ""),
+                        "locality": (restaurant or {}).get("locality", ""),
+                        "city": (restaurant or {}).get("city_name", ""),
+                    },
+                    "rating_state": o.get("ratingState"),
+                    "items": items_payload,
+                    "customer": customer_payload,
+                }
+                if bill_payload:
+                    order_details["bill"] = bill_payload
+
+                # Upsert (race-safe): concurrent syncs cannot create duplicates now
+                # that (platform, platform_review_id) is unique.
+                if engine.dialect.name == "postgresql":
+                    from sqlalchemy.dialects.postgresql import insert as pg_insert
+                    stmt = pg_insert(Review).values(
+                        brand_id=MOCK_BRAND_ID,
+                        platform="swiggy",
+                        platform_review_id=order_id,
+                        reviewer_name=customer.get("name", "Anonymous"),
+                        rating=rating,
+                        text=text,
+                        sentiment=_classify_sentiment(rating, text),
+                        topics=_extract_topics(text),
+                        order_id=order_id,
+                        order_details=order_details,
+                        location_id=location_id,
+                        **({"created_at": order_time} if order_time else {}),
+                    ).on_conflict_do_update(
+                        index_elements=["platform", "platform_review_id"],
+                        set_={
+                            "reviewer_name": stmt.excluded.reviewer_name,
+                            "rating": stmt.excluded.rating,
+                            "text": stmt.excluded.text,
+                            "sentiment": stmt.excluded.sentiment,
+                            "topics": stmt.excluded.topics,
+                            "order_id": stmt.excluded.order_id,
+                            "order_details": stmt.excluded.order_details,
+                            "location_id": stmt.excluded.location_id,
+                        },
+                    )
+                    result = db.execute(stmt)
+                    if result.rowcount:
+                        if existing:
+                            updated_count += 1
+                        else:
+                            new_count += 1
+                else:
+                    # SQLite fallback (local dev): pre-check then insert.
+                    if not existing:
+                        review = Review(
+                            brand_id=MOCK_BRAND_ID,
+                            platform="swiggy",
+                            platform_review_id=order_id,
+                            reviewer_name=customer.get("name", "Anonymous"),
+                            rating=rating,
+                            text=text,
+                            sentiment=_classify_sentiment(rating, text),
+                            topics=_extract_topics(text),
+                            order_id=order_id,
+                            order_details=order_details,
+                            location_id=location_id,
+                        )
+                        if order_time:
+                            review.created_at = order_time
+                        db.add(review)
+                        new_count += 1
+                    else:
+                        changed = False
+                        if existing.rating != rating:
+                            existing.rating = rating
+                            changed = True
+                        if text != existing.text:
+                            existing.text = text
+                            changed = True
+                        if order_time and existing.created_at != order_time:
+                            existing.created_at = order_time
+                            changed = True
+                        if existing.sentiment != _classify_sentiment(rating, text):
+                            existing.sentiment = _classify_sentiment(rating, text)
+                            changed = True
+                        if existing.topics != _extract_topics(text):
+                            existing.topics = _extract_topics(text)
+                            changed = True
+                        if changed:
+                            updated_count += 1
 
             if oldest_ms is None:
                 # No parseable timestamps; avoid an infinite loop.
