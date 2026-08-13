@@ -238,24 +238,15 @@ def _restaurant_by_id(restaurants: list[dict], rest_id) -> dict | None:
     return None
 
 
-def _ensure_unique_index(db) -> None:
+def _ensure_unique_index(db) -> bool:
     """Dedup reviews and ensure unique(platform, platform_review_id) exists.
 
     Self-healing: if the startup migration failed (or this DB predates it),
-    the ON CONFLICT upsert below requires the unique index. Idempotent.
+    the ON CONFLICT upsert below requires the unique index. Both statements
+    are idempotent (DELETE removes dupes, CREATE UNIQUE INDEX IF NOT EXISTS
+    is a no-op once present). Returns True if the index is usable.
     """
     try:
-        from sqlalchemy import inspect as sa_inspect
-        inspector = sa_inspect(db.bind)
-        unique_constraints = inspector.get_unique_constraints("reviews")
-        existing = {tuple(uc.get("column_names") or []) for uc in unique_constraints}
-        unique_indexes = {
-            tuple(idx.get("column_names") or [])
-            for idx in inspector.get_indexes("reviews")
-            if idx.get("unique")
-        }
-        if ("platform", "platform_review_id") in existing or ("platform", "platform_review_id") in unique_indexes:
-            return
         logger.info("Swiggy sync: deduping reviews and ensuring unique index")
         db.execute(text(
             """
@@ -275,8 +266,11 @@ def _ensure_unique_index(db) -> None:
         ))
         db.commit()
         logger.info("Swiggy sync: unique index ensured")
+        return True
     except Exception as e:
-        logger.warning(f"Swiggy sync: unique index check failed: {e}")
+        logger.warning(f"Swiggy sync: unique index ensure failed, using pre-check inserts: {e}")
+        db.rollback()
+        return False
 
 
 def sync_swiggy_reviews():
@@ -296,7 +290,8 @@ def sync_swiggy_reviews():
             logger.warning("Swiggy integration has no access token, skipping sync")
             return
 
-        _ensure_unique_index(db)
+        index_ready = _ensure_unique_index(db)
+        use_upsert = index_ready and engine.dialect.name == "postgresql"
 
         token = integration.auth_token
 
@@ -435,9 +430,11 @@ def sync_swiggy_reviews():
                 if bill_payload:
                     order_details["bill"] = bill_payload
 
-                # Upsert (race-safe): concurrent syncs cannot create duplicates now
-                # that (platform, platform_review_id) is unique.
-                if engine.dialect.name == "postgresql":
+                # Upsert (race-safe): concurrent syncs cannot create duplicates
+                # once (platform, platform_review_id) is unique. If the unique
+                # index is unavailable, fall back to pre-check inserts so the
+                # sync always completes.
+                if use_upsert:
                     from sqlalchemy.dialects.postgresql import insert as pg_insert
                     stmt = pg_insert(Review).values(
                         brand_id=MOCK_BRAND_ID,
