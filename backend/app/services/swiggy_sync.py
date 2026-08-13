@@ -11,6 +11,7 @@ from sqlalchemy import text
 from app.core.constants import MOCK_BRAND_ID
 from app.core.database import SessionLocal, engine
 from app.models.integration import Integration
+from app.models.location import Location
 from app.models.review import Review
 
 logger = logging.getLogger("swiggy_sync")
@@ -238,6 +239,36 @@ def _restaurant_by_id(restaurants: list[dict], rest_id) -> dict | None:
     return None
 
 
+def _ensure_outlet_locations(db, restaurants) -> dict[str, str]:
+    """Ensure a Location exists for every Swiggy outlet.
+
+    Existing locations are reused when the "Name (Locality)" matches exactly;
+    outlets with no matching location get a new one created so that every
+    review can be located. Returns {rest_id: location_id}.
+    """
+    mapping: dict[str, str] = {}
+    for r in restaurants:
+        rest_id = str(r.get("rest_id", ""))
+        if not rest_id:
+            continue
+        rest_name = (r.get("rest_name") or "").strip()
+        locality = (r.get("locality") or "").strip()
+        city = (r.get("city_name") or "").strip() or None
+        name = f"{rest_name} ({locality})" if locality else rest_name
+        loc = db.query(Location).filter(
+            Location.brand_id == MOCK_BRAND_ID,
+            Location.name == name,
+        ).first()
+        if not loc:
+            loc = Location(brand_id=MOCK_BRAND_ID, name=name, city=city)
+            db.add(loc)
+            db.flush()
+            logger.info(f"Swiggy sync: created location {name!r}")
+        mapping[rest_id] = str(loc.id)
+    db.commit()
+    return mapping
+
+
 def _ensure_unique_index(db) -> bool:
     """Dedup reviews and ensure unique(platform, platform_review_id) exists.
 
@@ -315,6 +346,7 @@ def sync_swiggy_reviews():
             restaurant_ids = [str(r.get("rest_id")) for r in restaurants]
 
         from app.models.location import Location
+        outlet_locations = _ensure_outlet_locations(db, restaurants)
         loc_pairs = [
             (str(loc.id), loc.name)
             for loc in db.query(Location).filter(Location.brand_id == MOCK_BRAND_ID).all()
@@ -407,7 +439,7 @@ def sync_swiggy_reviews():
                     pass
                 time.sleep(0.4)
 
-                lid = _match_location_id(restaurant or {}, loc_pairs)
+                lid = outlet_locations.get(str(o.get("restaurantID", ""))) or _match_location_id(restaurant or {}, loc_pairs)
                 location_id = None
                 if lid:
                     try:
@@ -505,6 +537,12 @@ def sync_swiggy_reviews():
                         if existing.topics != _extract_topics(text):
                             existing.topics = _extract_topics(text)
                             changed = True
+                        if location_id and existing.location_id != location_id:
+                            existing.location_id = location_id
+                            changed = True
+                        if existing.order_details != order_details:
+                            existing.order_details = order_details
+                            changed = True
                         if changed:
                             updated_count += 1
 
@@ -513,6 +551,26 @@ def sync_swiggy_reviews():
                 break
             window_end = int(oldest_ms) - 1
             time.sleep(0.5)
+
+        # Backfill location on existing swiggy reviews that missed it, so every
+        # review is located (reuses the fresh outlet->location mapping).
+        if outlet_locations:
+            located = 0
+            for rev in db.query(Review).filter(
+                Review.platform == "swiggy",
+                Review.location_id.is_(None),
+            ).all():
+                od = rev.order_details or {}
+                rid = str((od.get("restaurant") or {}).get("id", ""))
+                lid = outlet_locations.get(rid)
+                if lid:
+                    try:
+                        rev.location_id = uuid.UUID(lid)
+                        located += 1
+                    except (ValueError, AttributeError):
+                        pass
+            if located:
+                logger.info(f"Swiggy sync: located {located} existing reviews missing location")
 
         db.commit()
         integration.last_synced = datetime.now(timezone.utc).isoformat()
