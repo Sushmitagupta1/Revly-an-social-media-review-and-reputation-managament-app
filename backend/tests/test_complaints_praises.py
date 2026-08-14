@@ -111,3 +111,45 @@ def test_praises_location_counts(client, db_session):
     loc_counts = {t["topic"]: t["count"] for t in resp.json()["location_counts"]}
     assert loc_counts.get("Outlet B") == 1
     assert "Outlet A" not in loc_counts
+
+
+def _seed_dates(db):
+    from datetime import datetime, timezone
+    db.query(Review).delete()
+    db.commit()
+    db.add_all([
+        Review(brand_id=BRAND_ID, platform="google", reviewer_name="D1", rating=1,
+               text="old bad", sentiment="negative", topics=["service"],
+               is_resolved=False,
+               created_at=datetime(2024, 1, 10, tzinfo=timezone.utc)),
+        Review(brand_id=BRAND_ID, platform="google", reviewer_name="D2", rating=1,
+               text="new bad", sentiment="negative", topics=["service"],
+               is_resolved=False,
+               created_at=datetime(2024, 3, 20, tzinfo=timezone.utc)),
+        Review(brand_id=BRAND_ID, platform="google", reviewer_name="D3", rating=5,
+               text="new good", sentiment="positive", topics=["food_quality"],
+               is_resolved=False,
+               created_at=datetime(2024, 3, 21, tzinfo=timezone.utc)),
+    ])
+    db.commit()
+
+
+def test_complaints_date_filter(client, db_session):
+    user = _seed(db_session)
+    _seed_dates(db_session)
+    resp = client.get("/api/v1/complaints?date_from=2024-03-01&date_to=2024-03-31", headers=_auth(user))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 1
+    assert body["reviews"][0]["reviewer_name"] == "D2"
+    assert body["location_counts"] == []
+
+
+def test_praises_date_filter(client, db_session):
+    user = _seed(db_session)
+    _seed_dates(db_session)
+    resp = client.get("/api/v1/praises?date_from=2024-03-01&date_to=2024-03-31", headers=_auth(user))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 1
+    assert body["reviews"][0]["reviewer_name"] == "D3"

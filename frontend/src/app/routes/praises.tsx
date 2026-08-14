@@ -18,10 +18,10 @@ const PLATFORMS = [
 
 export default function PraisesPage() {
   const { reviews, total, page, pages, isLoading, topicCounts, locationCounts, platform, setPlatform, setPage, fetchPraises } = usePraisesStore()
-  const { selectedLocations } = useFilterStore()
+  const { selectedLocations, dateRange } = useFilterStore()
   const [view, setView] = useState<"location" | "brand">("location")
 
-  useEffect(() => { fetchPraises(selectedLocations) }, [selectedLocations])
+  useEffect(() => { fetchPraises(selectedLocations, dateRange.from, dateRange.to) }, [selectedLocations, dateRange.from, dateRange.to])
 
   const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0
   const breakdownData = view === "location" ? locationCounts.slice(0, 6) : topicCounts

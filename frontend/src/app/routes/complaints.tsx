@@ -23,10 +23,10 @@ const TOPICS = [
 
 export default function ComplaintsPage() {
   const { reviews, total, page, pages, isLoading, topicCounts, locationCounts, topic, setTopic, setPage, fetchComplaints, resolveReview } = useComplaintsStore()
-  const { selectedLocations } = useFilterStore()
+  const { selectedLocations, dateRange } = useFilterStore()
   const [view, setView] = useState<"location" | "brand">("location")
 
-  useEffect(() => { fetchComplaints(selectedLocations) }, [selectedLocations])
+  useEffect(() => { fetchComplaints(selectedLocations, dateRange.from, dateRange.to) }, [selectedLocations, dateRange.from, dateRange.to])
 
   const resolvedCount = reviews.filter((r) => r.is_resolved).length
   const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0

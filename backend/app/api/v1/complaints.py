@@ -1,6 +1,7 @@
 import json
 import math
 from collections import Counter
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Query
 from sqlalchemy import func
@@ -34,6 +35,8 @@ def list_complaints(
     topic: str | None = None,
     resolved: bool | None = None,
     location: str | None = None,
+    date_from: str | None = Query(None, description="Start date (YYYY-MM-DD)"),
+    date_to: str | None = Query(None, description="End date (YYYY-MM-DD)"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
 ):
@@ -47,6 +50,21 @@ def list_complaints(
             if loc_ids:
                 query = query.filter(Review.location_id.in_(loc_ids))
 
+    dt_from = None
+    dt_to = None
+    if date_from:
+        try:
+            dt_from = datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            query = query.filter(Review.created_at >= dt_from)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            dt_to = datetime.strptime(date_to, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
+            query = query.filter(Review.created_at < dt_to)
+        except ValueError:
+            pass
+
     if topic:
         query = query.filter(Review.topics.like(f'%"{topic}"%'))
     if resolved is not None:
@@ -55,6 +73,10 @@ def list_complaints(
     topic_query = db.query(Review).filter(Review.sentiment == "negative")
     if loc_ids:
         topic_query = topic_query.filter(Review.location_id.in_(loc_ids))
+    if dt_from:
+        topic_query = topic_query.filter(Review.created_at >= dt_from)
+    if dt_to:
+        topic_query = topic_query.filter(Review.created_at < dt_to)
 
     topic_counter: Counter = Counter()
     for r in topic_query.yield_per(500):
@@ -82,6 +104,10 @@ def list_complaints(
     )
     if loc_ids:
         loc_query = loc_query.filter(Review.location_id.in_(loc_ids))
+    if dt_from:
+        loc_query = loc_query.filter(Review.created_at >= dt_from)
+    if dt_to:
+        loc_query = loc_query.filter(Review.created_at < dt_to)
     loc_rows = loc_query.group_by(Review.location_id).all()
 
     loc_counter: Counter = Counter()
