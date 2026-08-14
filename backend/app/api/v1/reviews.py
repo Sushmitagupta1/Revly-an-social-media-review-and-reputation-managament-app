@@ -136,7 +136,7 @@ def list_reviews(
 
     total = query.count()
     pages = math.ceil(total / limit) if total > 0 else 1
-    reviews = query.order_by(Review.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
+    reviews = query.order_by(Review.created_at.desc(), Review.id.desc()).offset((page - 1) * limit).limit(limit).all()
 
     loc_map = _build_location_name_map(db)
     reply_counts = dict(db.query(Reply.review_id, func.count(Reply.id)).filter(Reply.status == "sent").group_by(Reply.review_id).all())

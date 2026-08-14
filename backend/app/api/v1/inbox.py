@@ -27,7 +27,7 @@ def list_inbox(
 
     total = query.count()
     pages = math.ceil(total / limit) if total > 0 else 1
-    reviews = query.order_by(Review.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
+    reviews = query.order_by(Review.created_at.desc(), Review.id.desc()).offset((page - 1) * limit).limit(limit).all()
 
     return InboxResponse(
         reviews=[ReviewResponse.model_validate(r) for r in reviews],
