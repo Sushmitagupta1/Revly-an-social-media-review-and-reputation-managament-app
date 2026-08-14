@@ -73,12 +73,18 @@ def _run_migrations(engine):
                       )
                     """
                 ))
-                conn.execute(sa.text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_reviews_platform_review "
-                    "ON reviews (platform, platform_review_id)"
-                ))
                 conn.commit()
-            logger.info("Reviews unique index added")
+            logger.info("Reviews deduplicated")
+            try:
+                with engine.connect() as conn:
+                    conn.execute(sa.text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_reviews_platform_review "
+                        "ON reviews (platform, platform_review_id)"
+                    ))
+                    conn.commit()
+                logger.info("Reviews unique index added")
+            except Exception as e:
+                logger.warning(f"Reviews unique index create failed (dedup already committed): {e}")
     except Exception as e:
         logger.warning(f"Reviews migration check failed (table may not exist yet): {e}")
 

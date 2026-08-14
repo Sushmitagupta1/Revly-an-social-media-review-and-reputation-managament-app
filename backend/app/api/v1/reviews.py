@@ -139,7 +139,7 @@ def list_reviews(
     reviews = query.order_by(Review.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
 
     loc_map = _build_location_name_map(db)
-    reply_counts = dict(db.query(Reply.review_id, func.count(Reply.id)).group_by(Reply.review_id).all())
+    reply_counts = dict(db.query(Reply.review_id, func.count(Reply.id)).filter(Reply.status == "sent").group_by(Reply.review_id).all())
     response_items = []
     for r in reviews:
         item = ReviewResponse.model_validate(r)

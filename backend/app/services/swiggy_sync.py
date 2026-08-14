@@ -269,17 +269,13 @@ def _ensure_outlet_locations(db, restaurants) -> dict[str, str]:
     return mapping
 
 
-def _ensure_unique_index(db) -> bool:
-    """Dedup reviews and ensure unique(platform, platform_review_id) exists.
-
-    Self-healing: if the startup migration failed (or this DB predates it),
-    the ON CONFLICT upsert below requires the unique index. Both statements
-    are idempotent (DELETE removes dupes, CREATE UNIQUE INDEX IF NOT EXISTS
-    is a no-op once present). Returns True if the index is usable.
-    """
+def _dedup_reviews(db) -> int:
+    """Delete duplicate reviews so every (platform, platform_review_id) has
+    exactly one row. Commits independently so the cleanup always persists,
+    even if the unique index below cannot be created (e.g. missing CREATE
+    INDEX permission on the managed DB)."""
     try:
-        logger.info("Swiggy sync: deduping reviews and ensuring unique index")
-        db.execute(text(
+        result = db.execute(text(
             """
             DELETE FROM reviews
             WHERE platform_review_id IS NOT NULL
@@ -291,17 +287,46 @@ def _ensure_unique_index(db) -> bool:
               )
             """
         ))
+        db.commit()
+        removed = result.rowcount or 0
+        if removed:
+            logger.info(f"Swiggy sync: removed {removed} duplicate reviews")
+        return removed
+    except Exception as e:
+        logger.warning(f"Swiggy sync: dedup failed: {e}")
+        db.rollback()
+        return 0
+
+
+def _ensure_unique_index(db) -> bool:
+    """Best-effort: ensure unique(platform, platform_review_id) exists.
+
+    The upsert path needs the index; the pre-check insert fallback does not.
+    Returns True when the index is present/usable. Failure never rolls back
+    the dedup (which already committed separately)."""
+    try:
         db.execute(text(
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_reviews_platform_review "
             "ON reviews (platform, platform_review_id)"
         ))
         db.commit()
-        logger.info("Swiggy sync: unique index ensured")
         return True
     except Exception as e:
-        logger.warning(f"Swiggy sync: unique index ensure failed, using pre-check inserts: {e}")
+        logger.warning(f"Swiggy sync: unique index ensure failed (dedup already committed): {e}")
         db.rollback()
         return False
+
+
+def _serialize_sync(db) -> None:
+    """Serialize concurrent Swiggy sync runs (15-min scheduler + manual) so
+    two overlapping runs cannot both miss the pre-check and insert the same
+    order. Held until the next commit. No-op on non-Postgres engines."""
+    if engine.dialect.name != "postgresql":
+        return
+    try:
+        db.execute(text("SELECT pg_advisory_xact_lock(973201)"))
+    except Exception as e:
+        logger.warning(f"Swiggy sync: advisory lock failed: {e}")
 
 
 def sync_swiggy_reviews():
@@ -321,6 +346,7 @@ def sync_swiggy_reviews():
             logger.warning("Swiggy integration has no access token, skipping sync")
             return
 
+        _dedup_reviews(db)
         index_ready = _ensure_unique_index(db)
         use_upsert = index_ready and engine.dialect.name == "postgresql"
 
@@ -347,6 +373,7 @@ def sync_swiggy_reviews():
 
         from app.models.location import Location
         outlet_locations = _ensure_outlet_locations(db, restaurants)
+        _serialize_sync(db)
         loc_pairs = [
             (str(loc.id), loc.name)
             for loc in db.query(Location).filter(Location.brand_id == MOCK_BRAND_ID).all()

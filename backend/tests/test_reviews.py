@@ -71,3 +71,24 @@ def test_review_stats_filters(client, db_session):
         headers=_auth(user),
     )
     assert resp.json()["total"] == 2
+
+
+def test_reply_count_counts_only_sent_replies(client, db_session):
+    from app.models.reply import Reply
+    user = _seed(db_session)
+    db_session.query(Reply).delete()
+    db_session.commit()
+    review = db_session.query(Review).order_by(Review.created_at).first()
+    db_session.add_all([
+        Reply(review_id=review.id, user_id=user.id, text="draft", is_ai_generated=False, status="draft"),
+        Reply(review_id=review.id, user_id=user.id, text="approved", is_ai_generated=False, status="approved"),
+        Reply(review_id=review.id, user_id=user.id, text="sent", is_ai_generated=False, status="sent"),
+    ])
+    db_session.commit()
+
+    resp = client.get("/api/v1/reviews", headers=_auth(user))
+    assert resp.status_code == 200
+    items = resp.json()["reviews"]
+    match = next((it for it in items if it["id"] == str(review.id)), None)
+    assert match is not None
+    assert match["reply_count"] == 1
