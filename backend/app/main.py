@@ -23,7 +23,7 @@ def _run_migrations(engine):
     try:
         inspector = inspect(engine)
         columns = [c["name"] for c in inspector.get_columns("integrations")]
-        missing = [c for c in ["auth_token", "csrf_token", "mx_csrf_token", "cookies", "restaurant_ids"] if c not in columns]
+        missing = [c for c in ["auth_token", "csrf_token", "mx_csrf_token", "cookies", "restaurant_ids", "last_sync_error"] if c not in columns]
         if missing:
             logger.info(f"Adding missing columns to integrations table: {missing}")
             with engine.connect() as conn:

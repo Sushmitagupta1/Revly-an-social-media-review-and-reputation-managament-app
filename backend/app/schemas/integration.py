@@ -14,6 +14,7 @@ class IntegrationUpdate(BaseModel):
     status: str | None = None
     is_connected: bool | None = None
     last_synced: str | None = None
+    last_sync_error: str | None = None
 
 
 class IntegrationResponse(BaseModel):
@@ -23,6 +24,7 @@ class IntegrationResponse(BaseModel):
     account_name: str
     status: str
     last_synced: str | None = None
+    last_sync_error: str | None = None
     is_connected: bool
     created_at: datetime
 

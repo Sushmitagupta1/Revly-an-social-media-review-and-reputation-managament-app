@@ -552,6 +552,7 @@ def sync_zomato_reviews():
         db.commit()
 
         integration.last_synced = datetime.now(timezone.utc).isoformat()
+        integration.last_sync_error = None
         db.commit()
 
         logger.info(f"Zomato sync complete: {new_count} new, {updated_count} updated")

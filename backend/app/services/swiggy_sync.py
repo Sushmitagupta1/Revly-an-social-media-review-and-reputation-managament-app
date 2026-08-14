@@ -269,33 +269,77 @@ def _ensure_outlet_locations(db, restaurants) -> dict[str, str]:
     return mapping
 
 
-def _dedup_reviews(db) -> int:
+def _dedup_reviews(db) -> tuple[int, str | None]:
     """Delete duplicate reviews so every (platform, platform_review_id) has
-    exactly one row. Commits independently so the cleanup always persists,
-    even if the unique index below cannot be created (e.g. missing CREATE
-    INDEX permission on the managed DB)."""
+    exactly one row.
+
+    ORM-based first because it uses the same write path as the rest of the
+    app (which is proven to work on the managed DB), with a raw-SQL fallback.
+    Commits independently so cleanup always persists even if the unique index
+    cannot be created. Returns (removed_count, error_or_None).
+    """
+    from app.models.reply import Reply
+    from sqlalchemy import func
+
+    def _run_orm() -> int:
+        seen: dict[tuple[str, str], Review] = {}
+        removed = 0
+        reply_counts = dict(
+            db.query(Reply.review_id, func.count(Reply.id)).group_by(Reply.review_id).all()
+        )
+        rows = (
+            db.query(Review)
+            .filter(Review.platform_review_id.isnot(None))
+            .order_by(Review.created_at, Review.id)
+            .all()
+        )
+        for r in rows:
+            key = (r.platform, r.platform_review_id)
+            kept = seen.get(key)
+            if kept is None:
+                seen[key] = r
+                continue
+            kept_score = (1 if reply_counts.get(kept.id, 0) else 0) + (1 if kept.is_resolved else 0)
+            r_score = (1 if reply_counts.get(r.id, 0) else 0) + (1 if r.is_resolved else 0)
+            if r_score > kept_score:
+                db.delete(kept)
+                seen[key] = r
+            else:
+                db.delete(r)
+            removed += 1
+        return removed
+
     try:
-        result = db.execute(text(
-            """
-            DELETE FROM reviews
-            WHERE platform_review_id IS NOT NULL
-              AND id NOT IN (
-                SELECT MIN(id)
-                FROM reviews
-                WHERE platform_review_id IS NOT NULL
-                GROUP BY platform, platform_review_id
-              )
-            """
-        ))
+        removed = _run_orm()
         db.commit()
-        removed = result.rowcount or 0
         if removed:
             logger.info(f"Swiggy sync: removed {removed} duplicate reviews")
-        return removed
+        return removed, None
     except Exception as e:
-        logger.warning(f"Swiggy sync: dedup failed: {e}")
+        orm_err = f"{type(e).__name__}: {e}"
+        logger.warning(f"Swiggy sync: ORM dedup failed ({orm_err}), trying raw SQL")
         db.rollback()
-        return 0
+        try:
+            result = db.execute(text(
+                """
+                DELETE FROM reviews
+                WHERE platform_review_id IS NOT NULL
+                  AND id NOT IN (
+                    SELECT MIN(id)
+                    FROM reviews
+                    WHERE platform_review_id IS NOT NULL
+                    GROUP BY platform, platform_review_id
+                  )
+                """
+            ))
+            db.commit()
+            removed = result.rowcount or 0
+            if removed:
+                logger.info(f"Swiggy sync: raw SQL removed {removed} duplicate reviews")
+            return removed, None
+        except Exception as e2:
+            db.rollback()
+            return 0, f"ORM: {orm_err}; raw: {type(e2).__name__}: {e2}"
 
 
 def _ensure_unique_index(db) -> bool:
@@ -346,7 +390,13 @@ def sync_swiggy_reviews():
             logger.warning("Swiggy integration has no access token, skipping sync")
             return
 
-        _dedup_reviews(db)
+        removed, dedup_error = _dedup_reviews(db)
+        if dedup_error:
+            integration.last_sync_error = dedup_error
+            db.commit()
+        elif integration.last_sync_error:
+            integration.last_sync_error = None
+            db.commit()
         index_ready = _ensure_unique_index(db)
         use_upsert = index_ready and engine.dialect.name == "postgresql"
 
